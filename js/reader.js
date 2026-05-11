@@ -257,14 +257,6 @@ function renderShell(container, title, authorName, bodyHtml, savedPos) {
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M10 3L5 8l5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
             Search
           </a>
-          <button class="reader-contents-btn" id="reader-contents-btn" aria-label="Table of contents" aria-expanded="false">
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-              <line x1="2" y1="4" x2="14" y2="4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-              <line x1="2" y1="8" x2="10" y2="8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-              <line x1="2" y1="12" x2="12" y2="12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-            </svg>
-            Contents
-          </button>
         </div>
 
         <div class="reader-book-info">
@@ -278,12 +270,25 @@ function renderShell(container, title, authorName, bodyHtml, savedPos) {
       </div>
     </div>
 
+    <button class="reader-contents-btn" id="reader-contents-btn" aria-label="Table of contents" aria-expanded="false">
+      <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
+        <line x1="2" y1="5" x2="16" y2="5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        <line x1="2" y1="9" x2="12" y2="9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        <line x1="2" y1="13" x2="14" y2="13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+      </svg>
+    </button>
+
     <button class="reader-toolbar-trigger" aria-label="Open reading controls">
       <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
         <circle cx="9" cy="4" r="1.5" fill="currentColor"/>
         <circle cx="9" cy="9" r="1.5" fill="currentColor"/>
         <circle cx="9" cy="14" r="1.5" fill="currentColor"/>
       </svg>
+    </button>
+
+    <button class="reader-jump-btn hidden" id="reader-jump-btn" aria-label="Jump to first chapter">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M7 2v10M2 7l5 5 5-5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Jump to Chapter I
     </button>
 
     <div class="reader-toolbar" role="toolbar" aria-label="Reading controls">
@@ -408,6 +413,29 @@ async function fetchAndRenderBook(container, bookId) {
     });
   } else {
     chapterNavList.innerHTML = '<p class="chapter-nav-empty">No chapters found.</p>';
+  }
+
+  // Jump-to-chapter button: show if first chapter heading is not near the top
+  const jumpBtn = container.querySelector('#reader-jump-btn');
+  const chapterPattern = /^(chapter|chap\.?\s*[ivxlcdm\d]|part\s+[ivxlcdm\d])/i;
+  const firstChapterH2 = Array.from(article.querySelectorAll('h2[id]')).find(h =>
+    chapterPattern.test(h.textContent.trim())
+  );
+  if (firstChapterH2 && firstChapterH2.offsetTop > window.innerHeight * 1.5) {
+    const label = firstChapterH2.textContent.trim().replace(/\s+/g, ' ').slice(0, 30);
+    jumpBtn.lastChild.textContent = ` Jump to ${label}`;
+    jumpBtn.classList.remove('hidden');
+    jumpBtn.addEventListener('click', () => {
+      firstChapterH2.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      jumpBtn.classList.add('hidden');
+    });
+    const hideJumpOnScroll = () => {
+      if (firstChapterH2.getBoundingClientRect().top < window.innerHeight) {
+        jumpBtn.classList.add('hidden');
+        window.removeEventListener('scroll', hideJumpOnScroll);
+      }
+    };
+    window.addEventListener('scroll', hideJumpOnScroll, { passive: true });
   }
 
   function openNav() {
