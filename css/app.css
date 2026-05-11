@@ -366,6 +366,62 @@ body {
   to { transform: rotate(360deg); }
 }
 
+/* ─── Library ────────────────────────────────────────────────────── */
+
+.library-card {
+  position: relative;
+}
+
+.library-remove-btn {
+  position: absolute;
+  top: var(--space-sm);
+  right: var(--space-sm);
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  border-radius: var(--radius-pill);
+  background-color: var(--color-bg-subtle);
+  opacity: 0;
+  transition: opacity var(--transition-fast), color var(--transition-fast);
+  z-index: 1;
+}
+
+.library-card:hover .library-remove-btn,
+.library-card:focus-within .library-remove-btn {
+  opacity: 1;
+}
+
+.library-remove-btn:hover {
+  color: var(--color-text);
+  background-color: var(--color-border);
+}
+
+.library-progress-bar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background-color: var(--color-border);
+  border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+  overflow: hidden;
+}
+
+.library-progress-fill {
+  height: 100%;
+  background-color: var(--color-accent);
+  transition: width var(--transition-base);
+}
+
+.library-progress-label {
+  color: var(--color-accent);
+  font-weight: 500;
+}
+
 /* ─── Desktop ────────────────────────────────────────────────────── */
 
 @media (min-width: 768px) {
@@ -380,5 +436,9 @@ body {
   .book-cover {
     width: 72px;
     height: 104px;
+  }
+
+  .library-remove-btn {
+    opacity: 0;
   }
 }
