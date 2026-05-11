@@ -41,142 +41,69 @@ function upsertLibraryBook(book) {
   saveLibrary(library);
 }
 
+function escapeHtml(str) {
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
 /* ─── URL helpers ───────────────────────────────────────────────── */
 
 function toHttps(url) {
   return url ? url.replace(/^http:\/\//i, 'https://') : url;
 }
 
-function pickTextUrl(formats, bookId) {
-  const candidates = [
-    formats['text/plain; charset=utf-8'],
-    formats['text/plain'],
-  ];
-  for (const url of candidates) {
-    if (url && !url.endsWith('.zip')) {
-      const u = toHttps(url);
-      // Rewrite ebook redirect URLs to direct cache path
-      return u.replace(
-        /https:\/\/www\.gutenberg\.org\/ebooks\/(\d+)\.txt[^\s]*/i,
-        (_, id) => `https://www.gutenberg.org/cache/epub/${id}/pg${id}.txt`
-      );
+/* ─── HTML processing ───────────────────────────────────────────── */
+
+function processGutenbergHtml(htmlString, bookId) {
+  const base = `https://www.gutenberg.org/cache/epub/${bookId}/`;
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(htmlString, 'text/html');
+
+  // Remove header and footer boilerplate sections
+  const header = doc.getElementById('pg-header');
+  if (header) header.remove();
+  const footer = doc.getElementById('pg-footer');
+  if (footer) footer.remove();
+
+  // Remove page number spans
+  doc.querySelectorAll('.pagenum').forEach(el => el.remove());
+
+  // Rewrite relative image src and href to absolute Gutenberg URLs
+  doc.querySelectorAll('img[src]').forEach(img => {
+    const src = img.getAttribute('src');
+    if (src && !src.startsWith('http') && !src.startsWith('//')) {
+      img.setAttribute('src', base + src);
     }
-  }
-  return `https://www.gutenberg.org/cache/epub/${bookId}/pg${bookId}.txt`;
-}
+    // Remove fixed dimensions so images scale fluidly
+    img.removeAttribute('width');
+    img.removeAttribute('height');
+    img.removeAttribute('id');
+  });
 
-/* ─── Text processing ───────────────────────────────────────────── */
-
-function processPlainText(raw) {
-  // Strip Gutenberg header/footer
-  const startRx = /\*{3}\s*START OF (?:THE |THIS )?PROJECT GUTENBERG[^\n]*\n/i;
-  const endRx = /\*{3}\s*END OF (?:THE |THIS )?PROJECT GUTENBERG[^\n]*/i;
-  const startMatch = raw.match(startRx);
-  const endMatch = raw.match(endRx);
-  const start = startMatch ? raw.indexOf(startMatch[0]) + startMatch[0].length : 0;
-  const end = endMatch ? raw.indexOf(endMatch[0]) : raw.length;
-  let text = raw.slice(start, end).trim();
-
-  // Clean up markup artifacts
-  text = text.replace(/\[Illustration[^\]]*\]/gi, '');
-  text = text.replace(/\[Footnote[^\]]*\]/gi, '');
-  text = text.replace(/\[Sidenote[^\]]*\]/gi, '');
-  text = text.replace(/_([^_\n]+)_/g, '<em>$1</em>');
-
-  const blocks = text.split(/\n{2,}/);
-  const parts = [];
-  let chapterIndex = 0;
-
-  for (const block of blocks) {
-    const trimmed = block.trim();
-    if (!trimmed) continue;
-
-    const lines = trimmed.split('\n').map(l => l.trim()).filter(Boolean);
-    if (!lines.length) continue;
-
-    const singleLine = lines.length <= 3;
-    const firstLine = lines[0];
-
-    // Chapter / section heading detection
-    const isChapter = singleLine && (
-      /^(CHAPTER|CHAP\.)\s+/i.test(firstLine) ||
-      /^PART\s+/i.test(firstLine) ||
-      /^BOOK\s+/i.test(firstLine) ||
-      /^VOLUME\s+/i.test(firstLine) ||
-      /^SECTION\s+/i.test(firstLine) ||
-      (firstLine.length <= 60 && firstLine === firstLine.toUpperCase() && /[A-Z]{3,}/.test(firstLine) && !/[.!?,;]/.test(firstLine))
-    );
-
-    if (isChapter) {
-      const id = `chapter-${chapterIndex++}`;
-      const label = lines.map(escapeHtml).join(' ');
-      parts.push(`<h2 id="${id}">${label}</h2>`);
-    } else {
-      const content = lines.join(' ').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-      // Re-insert em tags (they got escaped above — handle differently)
-      parts.push(`<p>${lines.map(l => l.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')).join(' ')}</p>`);
+  doc.querySelectorAll('a[href]').forEach(a => {
+    const href = a.getAttribute('href');
+    if (href && href.startsWith('images/')) {
+      a.setAttribute('href', base + href);
     }
-  }
+    // Remove internal anchor-only links (they'll break scroll after extraction)
+    if (href && href.startsWith('#')) {
+      a.removeAttribute('href');
+    }
+  });
 
-  return parts.join('\n');
-}
-
-function escapeHtml(str) {
-  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-}
-
-function processPlainTextClean(raw) {
-  const startRx = /\*{3}\s*START OF (?:THE |THIS )?PROJECT GUTENBERG[^\n]*\n/i;
-  const endRx = /\*{3}\s*END OF (?:THE |THIS )?PROJECT GUTENBERG[^\n]*/i;
-  const startMatch = raw.match(startRx);
-  const endMatch = raw.match(endRx);
-  const start = startMatch ? raw.indexOf(startMatch[0]) + startMatch[0].length : 0;
-  const end = endMatch ? raw.indexOf(endMatch[0]) : raw.length;
-  let text = raw.slice(start, end).trim();
-
-  text = text.replace(/\[Illustration[^\]]*\]/gi, '');
-  text = text.replace(/\[Footnote[^\]]*\]/gi, '');
-  text = text.replace(/\[Sidenote[^\]]*\]/gi, '');
-
-  const blocks = text.split(/\n{2,}/);
-  const parts = [];
-  let chapterIndex = 0;
-
-  for (const block of blocks) {
-    const trimmed = block.trim();
-    if (!trimmed) continue;
-
-    const lines = trimmed.split('\n').map(l => l.trim()).filter(Boolean);
-    if (!lines.length) continue;
-
-    const firstLine = lines[0];
-    const singleLine = lines.length <= 3;
-
-    const isHeading = singleLine && (
-      /^(CHAPTER|CHAP\.)\s+/i.test(firstLine) ||
-      /^PART\s+/i.test(firstLine) ||
-      /^BOOK\s+/i.test(firstLine) ||
-      /^VOLUME\s+/i.test(firstLine) ||
-      /^SECTION\s+/i.test(firstLine) ||
-      (firstLine.length <= 60 && firstLine === firstLine.toUpperCase() && /[A-Z]{3,}/.test(firstLine) && !/[.!?,;:]/.test(firstLine))
-    );
-
-    if (isHeading) {
-      const id = `chapter-${chapterIndex++}`;
-      parts.push(`<h2 id="${id}">${lines.map(escapeHtml).join('<br>')}</h2>`);
-    } else {
-      // Detect verse/poetry (short lines, indented, or consistent short length)
-      const avgLen = lines.reduce((s, l) => s + l.length, 0) / lines.length;
-      const isVerse = lines.length > 1 && avgLen < 50 && lines.every(l => l.length < 80);
-      if (isVerse) {
-        parts.push(`<pre class="verse">${lines.map(escapeHtml).join('\n')}</pre>`);
-      } else {
-        parts.push(`<p>${escapeHtml(lines.join(' '))}</p>`);
+  // Promote anchor ids from inside h2 to the h2 itself for chapter nav
+  doc.querySelectorAll('h2').forEach(h2 => {
+    if (!h2.id) {
+      const anchor = h2.querySelector('a[id]');
+      if (anchor) {
+        h2.id = anchor.id;
+        anchor.removeAttribute('id');
       }
     }
-  }
+  });
 
-  return parts.join('\n');
+  const body = doc.body;
+  if (!body) return '';
+  return body.innerHTML;
 }
 
 /* ─── Chapter nav ───────────────────────────────────────────────── */
@@ -186,7 +113,7 @@ function buildChapterNavFromArticle(article) {
   if (headings.length < 2) return null;
 
   return headings.map(h => {
-    const label = h.textContent.trim().replace(/\s+/g, ' ');
+    const label = h.textContent.trim().replace(/\s+/g, ' ') || h.id;
     return `<a href="#${h.id}" class="chapter-nav-item" data-target="${h.id}">${escapeHtml(label)}</a>`;
   }).join('');
 }
@@ -194,9 +121,8 @@ function buildChapterNavFromArticle(article) {
 /* ─── Progress ──────────────────────────────────────────────────── */
 
 function calcScrollOffset() {
-  const scrolled = window.scrollY;
   const total = document.documentElement.scrollHeight - window.innerHeight;
-  return total > 0 ? Math.round((scrolled / total) * 100000) : 0;
+  return total > 0 ? Math.round((window.scrollY / total) * 100000) : 0;
 }
 
 function scrollToOffset(offset) {
@@ -206,24 +132,21 @@ function scrollToOffset(offset) {
 }
 
 function calcProgressPercent() {
-  const scrolled = window.scrollY;
   const total = document.documentElement.scrollHeight - window.innerHeight;
-  return total > 0 ? Math.min(100, (scrolled / total) * 100) : 0;
+  return total > 0 ? Math.min(100, (window.scrollY / total) * 100) : 0;
 }
 
 /* ─── Toolbar ───────────────────────────────────────────────────── */
 
 function buildToolbar(container, bookId, bookData) {
-  const prefs = (() => {
+  function getPrefs() {
     try { return JSON.parse(localStorage.getItem('gutenreader_prefs') || '{}'); } catch { return {}; }
-  })();
+  }
 
   function savePref(key, value) {
-    const current = (() => {
-      try { return JSON.parse(localStorage.getItem('gutenreader_prefs') || '{}'); } catch { return {}; }
-    })();
-    current[key] = value;
-    try { localStorage.setItem('gutenreader_prefs', JSON.stringify(current)); } catch { /* unavailable */ }
+    const prefs = getPrefs();
+    prefs[key] = value;
+    try { localStorage.setItem('gutenreader_prefs', JSON.stringify(prefs)); } catch { /* unavailable */ }
     if (typeof applyPrefs === 'function') applyPrefs();
   }
 
@@ -251,14 +174,14 @@ function buildToolbar(container, bookId, bookData) {
 
   container.querySelector('[data-action="font-smaller"]').addEventListener('click', () => {
     const root = document.documentElement;
-    root.dataset.fontSize = (root.dataset.fontSize || 'normal') === 'large' ? 'normal' : 'small';
+    root.dataset.fontSize = root.dataset.fontSize === 'large' ? 'normal' : 'small';
     savePref('fontSize', root.dataset.fontSize);
     showToolbar();
   });
 
   container.querySelector('[data-action="font-larger"]').addEventListener('click', () => {
     const root = document.documentElement;
-    root.dataset.fontSize = (root.dataset.fontSize || 'normal') === 'small' ? 'normal' : 'large';
+    root.dataset.fontSize = root.dataset.fontSize === 'small' ? 'normal' : 'large';
     savePref('fontSize', root.dataset.fontSize);
     showToolbar();
   });
@@ -271,7 +194,7 @@ function buildToolbar(container, bookId, bookData) {
       container.querySelectorAll('[data-action="theme"]').forEach(b => b.classList.toggle('active', b.dataset.value === theme));
       showToolbar();
     });
-    if (btn.dataset.value === (prefs.theme || 'sepia')) btn.classList.add('active');
+    if (btn.dataset.value === (getPrefs().theme || 'sepia')) btn.classList.add('active');
   });
 
   container.querySelector('[data-action="font-toggle"]').addEventListener('click', () => {
@@ -291,7 +214,7 @@ function buildToolbar(container, bookId, bookData) {
       container.querySelectorAll('[data-action="width"]').forEach(b => b.classList.toggle('active', b.dataset.value === width));
       showToolbar();
     });
-    if (btn.dataset.value === (prefs.lineWidth || 'normal')) btn.classList.add('active');
+    if (btn.dataset.value === (getPrefs().lineWidth || 'normal')) btn.classList.add('active');
   });
 
   const saveBtn = container.querySelector('[data-action="save-book"]');
@@ -309,8 +232,9 @@ function buildToolbar(container, bookId, bookData) {
 
 /* ─── Render shell ──────────────────────────────────────────────── */
 
-function renderShell(container, title, authorName, bodyHtml, savedPos, currentFont) {
+function renderShell(container, title, authorName, bodyHtml, savedPos) {
   const percentComplete = Math.round((savedPos / 100000) * 1000) / 10;
+  const currentFont = document.documentElement.dataset.font || 'serif';
 
   container.innerHTML = `
     <div class="reader-layout" id="reader-view">
@@ -321,7 +245,9 @@ function renderShell(container, title, authorName, bodyHtml, savedPos, currentFo
           <span class="chapter-nav-title">Contents</span>
           <button class="chapter-nav-close" id="chapter-nav-close" aria-label="Close contents">&#x2715;</button>
         </div>
-        <div class="chapter-nav-list" id="chapter-nav-list"></div>
+        <div class="chapter-nav-list" id="chapter-nav-list">
+          <p class="chapter-nav-loading">Loading contents&hellip;</p>
+        </div>
       </nav>
       <div class="chapter-nav-backdrop" id="chapter-nav-backdrop"></div>
 
@@ -386,7 +312,7 @@ async function fetchAndRenderBook(container, bookId) {
     <div class="reader-view">
       <div class="state-block" role="status" aria-live="polite">
         <div class="spinner" aria-hidden="true"></div>
-        <p class="state-block-body">Loading book…</p>
+        <p class="state-block-body">Loading book&hellip;</p>
       </div>
     </div>
   `;
@@ -415,22 +341,22 @@ async function fetchAndRenderBook(container, bookId) {
   const authors = bookMeta.authors || [];
   const authorName = authors.length ? authors.map(a => a.name).join(', ') : 'Unknown author';
   const coverUrl = toHttps(bookMeta.formats['image/jpeg'] || '');
-  const textUrl = pickTextUrl(bookMeta.formats, bookId);
 
   container.innerHTML = `
     <div class="reader-view">
       <div class="state-block" role="status" aria-live="polite">
         <div class="spinner" aria-hidden="true"></div>
-        <p class="state-block-body">Fetching book…</p>
+        <p class="state-block-body">Fetching book&hellip;</p>
       </div>
     </div>
   `;
 
-  let rawText = '';
+  const htmlUrl = `https://www.gutenberg.org/cache/epub/${bookId}/pg${bookId}-images.html`;
+  let rawHtml = '';
   try {
-    const res = await fetch(`https://corsproxy.io/?url=${encodeURIComponent(textUrl)}`);
+    const res = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent(htmlUrl)}`);
     if (!res.ok) throw new Error();
-    rawText = await res.text();
+    rawHtml = await res.text();
   } catch {
     container.innerHTML = `
       <div class="reader-view">
@@ -444,10 +370,9 @@ async function fetchAndRenderBook(container, bookId) {
     return;
   }
 
-  const bodyHtml = processPlainTextClean(rawText);
+  const bodyHtml = processGutenbergHtml(rawHtml, bookId);
   const savedPos = getStoredPosition(bookId);
   const percentComplete = Math.round((savedPos / 100000) * 1000) / 10;
-  const currentFont = document.documentElement.dataset.font || 'serif';
 
   const bookData = {
     id: bookId,
@@ -456,11 +381,10 @@ async function fetchAndRenderBook(container, bookId) {
     coverUrl,
     savedAt: Date.now(),
     position: savedPos,
-    totalLength: rawText.length,
     percentComplete,
   };
 
-  renderShell(container, title, authorName, bodyHtml, savedPos, currentFont);
+  renderShell(container, title, authorName, bodyHtml, savedPos);
 
   const article = container.querySelector('#reader-article');
   const progressBar = container.querySelector('#reader-progress-bar');
@@ -470,23 +394,21 @@ async function fetchAndRenderBook(container, bookId) {
   const chapterNavBackdrop = container.querySelector('#chapter-nav-backdrop');
   const contentsBtn = container.querySelector('#reader-contents-btn');
 
-  // Build chapter nav
-  requestAnimationFrame(() => {
-    const navHtml = buildChapterNavFromArticle(article);
-    if (navHtml) {
-      chapterNavList.innerHTML = navHtml;
-      chapterNavList.querySelectorAll('.chapter-nav-item').forEach(link => {
-        link.addEventListener('click', e => {
-          e.preventDefault();
-          const target = document.getElementById(link.dataset.target);
-          if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-          closeNav();
-        });
+  // Build chapter nav after article is in DOM
+  const navHtml = buildChapterNavFromArticle(article);
+  if (navHtml) {
+    chapterNavList.innerHTML = navHtml;
+    chapterNavList.querySelectorAll('.chapter-nav-item').forEach(link => {
+      link.addEventListener('click', e => {
+        e.preventDefault();
+        const target = document.getElementById(link.dataset.target);
+        if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        closeNav();
       });
-    } else {
-      chapterNavList.innerHTML = '<p class="chapter-nav-empty">No chapters found.</p>';
-    }
-  });
+    });
+  } else {
+    chapterNavList.innerHTML = '<p class="chapter-nav-empty">No chapters found.</p>';
+  }
 
   function openNav() {
     chapterNav.classList.add('open');
@@ -506,15 +428,18 @@ async function fetchAndRenderBook(container, bookId) {
   chapterNavClose.addEventListener('click', closeNav);
   chapterNavBackdrop.addEventListener('click', closeNav);
 
+  progressBar.style.width = `${percentComplete}%`;
   if (savedPos > 0) requestAnimationFrame(() => scrollToOffset(savedPos));
 
-  progressBar.style.width = `${percentComplete}%`;
-
   let scrollTimer = null;
+  let lastPct = -1;
   function onScroll() {
     const pct = calcProgressPercent();
-    progressBar.style.width = `${pct}%`;
-    progressBar.setAttribute('aria-valuenow', pct.toFixed(1));
+    if (Math.abs(pct - lastPct) >= 0.1) {
+      progressBar.style.width = `${pct}%`;
+      progressBar.setAttribute('aria-valuenow', pct.toFixed(1));
+      lastPct = pct;
+    }
     clearTimeout(scrollTimer);
     scrollTimer = setTimeout(() => {
       const offset = calcScrollOffset();
