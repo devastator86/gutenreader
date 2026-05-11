@@ -30,9 +30,11 @@ function getBirthYear(authors) {
   return authors[0].birth_year;
 }
 
-async function fetchBooks(query) {
+async function fetchBooks(query, params = {}) {
   const url = new URL(GUTENDEX_BASE);
-  url.searchParams.set('search', query);
+  if (query) url.searchParams.set('search', query);
+  if (params.sort) url.searchParams.set('sort', params.sort);
+  if (params.topic) url.searchParams.set('topic', params.topic);
   const res = await fetch(url.toString());
   if (!res.ok) throw new Error(`Search failed: ${res.status}`);
   return res.json();
@@ -69,11 +71,50 @@ function renderEmpty(query) {
   `;
 }
 
-function renderInitialState() {
+const GENRES = [
+  { label: 'Fiction', topic: 'fiction' },
+  { label: 'Mystery', topic: 'mystery' },
+  { label: 'Science Fiction', topic: 'science fiction' },
+  { label: 'Poetry', topic: 'poetry' },
+  { label: 'Philosophy', topic: 'philosophy' },
+  { label: 'History', topic: 'history' },
+  { label: 'Romance', topic: 'love stories' },
+  { label: 'Adventure', topic: 'adventure stories' },
+];
+
+const AUTHORS = [
+  'Jane Austen', 'Charles Dickens', 'Mark Twain',
+  'Leo Tolstoy', 'Arthur Conan Doyle', 'Oscar Wilde',
+  'Edgar Allan Poe', 'H.G. Wells', 'Jules Verne',
+];
+
+function renderDiscovery() {
+  const genreChips = GENRES.map(g =>
+    `<button class="discovery-chip" data-type="genre" data-topic="${escapeHtml(g.topic)}">${escapeHtml(g.label)}</button>`
+  ).join('');
+
+  const authorChips = AUTHORS.map(a =>
+    `<button class="discovery-chip" data-type="author" data-query="${escapeHtml(a)}">${escapeHtml(a)}</button>`
+  ).join('');
+
   return `
-    <div class="state-block">
-      <div class="state-block-icon" aria-hidden="true">&#x1F50D;</div>
-      <p class="state-block-body">Search 70,000+ free classic books.</p>
+    <div class="discovery">
+      <section class="discovery-section">
+        <h2 class="discovery-title">Most popular</h2>
+        <div class="discovery-books" id="popular-books">
+          <div class="state-block" role="status">
+            <div class="spinner" aria-hidden="true"></div>
+          </div>
+        </div>
+      </section>
+      <section class="discovery-section">
+        <h2 class="discovery-title">Browse by genre</h2>
+        <div class="discovery-chips">${genreChips}</div>
+      </section>
+      <section class="discovery-section">
+        <h2 class="discovery-title">Popular authors</h2>
+        <div class="discovery-chips">${authorChips}</div>
+      </section>
     </div>
   `;
 }
@@ -131,7 +172,7 @@ function initSearch(container, params) {
     <div class="search-view">
       <div class="search-hero">
         <h1 class="search-hero-title">Classic literature,<br>beautifully read.</h1>
-        <p class="search-hero-subtitle">Free books from Project Gutenberg.</p>
+        <p class="search-hero-subtitle">Read 70,000+ free classic books from Project Gutenberg.</p>
       </div>
       <form class="search-form" role="search" aria-label="Search books">
         <input
@@ -171,14 +212,15 @@ function initSearch(container, params) {
     results.innerHTML = html;
   }
 
-  const doSearch = debounce(async function (query) {
+  const doSearch = debounce(async function (query, fetchParams = {}) {
     query = query.trim();
-    if (query === lastQuery) return;
-    lastQuery = query;
+    const cacheKey = query + JSON.stringify(fetchParams);
+    if (cacheKey === lastQuery) return;
+    lastQuery = cacheKey;
 
-    if (!query) {
+    if (!query && !fetchParams.sort && !fetchParams.topic) {
       setStatus('');
-      showResults(renderInitialState());
+      showDiscovery();
       return;
     }
 
@@ -186,9 +228,9 @@ function initSearch(container, params) {
     setStatus('');
 
     try {
-      const data = await fetchBooks(query);
+      const data = await fetchBooks(query, fetchParams);
 
-      if (query !== lastQuery) return;
+      if (cacheKey !== lastQuery) return;
 
       if (!data.results || data.results.length === 0) {
         setStatus('');
@@ -208,6 +250,48 @@ function initSearch(container, params) {
     }
   }, 300);
 
+  function showDiscovery() {
+    showResults(renderDiscovery());
+    // Load popular books
+    fetchBooks('', { sort: 'popular' }).then(data => {
+      const el = results.querySelector('#popular-books');
+      if (!el) return;
+      if (!data.results || !data.results.length) {
+        el.innerHTML = '';
+        return;
+      }
+      el.innerHTML = renderResults(data.results.slice(0, 10));
+    }).catch(() => {
+      const el = results.querySelector('#popular-books');
+      if (el) el.innerHTML = '';
+    });
+
+    // Wire genre and author chips
+    results.querySelectorAll('.discovery-chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        if (chip.dataset.type === 'genre') {
+          input.value = '';
+          updateClearBtn();
+          setStatus('');
+          lastQuery = '';
+          doSearch.cancel && doSearch.cancel();
+          lastQuery = 'genre:' + chip.dataset.topic;
+          showResults(renderLoading());
+          fetchBooks('', { topic: chip.dataset.topic }).then(data => {
+            if (!data.results || !data.results.length) { showResults(renderEmpty(chip.textContent)); return; }
+            setStatus(`${data.count.toLocaleString()} results`);
+            showResults(renderResults(data.results));
+          }).catch(() => showResults(renderError('Could not reach Gutendex.')));
+        } else {
+          input.value = chip.dataset.query;
+          updateClearBtn();
+          lastQuery = '';
+          doSearch(chip.dataset.query);
+        }
+      });
+    });
+  }
+
   input.addEventListener('input', () => {
     updateClearBtn();
     doSearch(input.value);
@@ -219,7 +303,7 @@ function initSearch(container, params) {
     updateClearBtn();
     lastQuery = '';
     setStatus('');
-    showResults(renderInitialState());
+    showDiscovery();
   });
 
   results.addEventListener('click', e => {
@@ -228,7 +312,7 @@ function initSearch(container, params) {
     window.location.hash = `reader/${card.dataset.id}`;
   });
 
-  showResults(renderInitialState());
+  showDiscovery();
   input.focus();
 
   if (params && params.query) {
