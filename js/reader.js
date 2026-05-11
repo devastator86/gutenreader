@@ -385,7 +385,7 @@ async function fetchAndRenderBook(container, bookId) {
   const htmlUrl = `https://www.gutenberg.org/cache/epub/${bookId}/pg${bookId}-images.html`;
   let rawHtml = '';
   try {
-    const res = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent(htmlUrl)}`);
+    const res = await fetch(`https://gutenberg-proxy.devastator86.workers.dev/?url=${encodeURIComponent(htmlUrl)}`);
     if (!res.ok) throw new Error();
     rawHtml = await res.text();
   } catch {
