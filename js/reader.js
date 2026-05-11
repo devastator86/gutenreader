@@ -285,22 +285,30 @@ async function fetchAndRenderBook(container, bookId) {
     return url ? url.replace(/^http:\/\//i, 'https://') : url;
   }
 
-  function pickTextUrl(formats) {
+  function pickTextUrl(formats, bookId) {
     const candidates = [
       formats['text/plain; charset=utf-8'],
       formats['text/plain'],
     ];
     for (const url of candidates) {
-      if (url && !url.endsWith('.zip')) return toHttps(url);
+      if (url && !url.endsWith('.zip')) {
+        const https = toHttps(url);
+        // Rewrite www.gutenberg.org ebook URLs to the cache CDN path which has CORS headers
+        return https.replace(
+          /https:\/\/www\.gutenberg\.org\/ebooks\/(\d+)\.txt(\.\S+)?/i,
+          (_, id) => `https://www.gutenberg.org/cache/epub/${id}/pg${id}.txt`
+        );
+      }
     }
-    return null;
+    // Fallback: construct cache URL directly from book ID
+    return `https://www.gutenberg.org/cache/epub/${bookId}/pg${bookId}.txt`;
   }
 
   const title = bookMeta.title || 'Untitled';
   const authors = bookMeta.authors || [];
   const authorName = authors.length ? authors.map(a => a.name).join(', ') : 'Unknown author';
   const coverUrl = toHttps(bookMeta.formats['image/jpeg'] || '');
-  const textUrl = pickTextUrl(bookMeta.formats);
+  const textUrl = pickTextUrl(bookMeta.formats, bookId);
 
   if (!textUrl) {
     main.innerHTML = `
