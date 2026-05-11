@@ -340,6 +340,10 @@ async function fetchAndRenderBook(container, bookId) {
   main.innerHTML = `
     <div class="reader-view" id="reader-view">
       <div class="reader-progress-bar" id="reader-progress-bar" role="progressbar" aria-valuenow="${percentComplete}" aria-valuemin="0" aria-valuemax="100"></div>
+      <a href="#search" class="reader-back" aria-label="Back to search">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M10 3L5 8l5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Search
+      </a>
       <div class="reader-book-info">
         <h1 class="reader-book-title">${escapeHtml(title)}</h1>
         <p class="reader-book-author">${escapeHtml(authorName)}</p>

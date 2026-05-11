@@ -41,16 +41,28 @@ function navigate(view, params = {}) {
   });
 
   const main = document.getElementById('main-content');
-  main.innerHTML = '';
+  main.classList.add('view-exit');
 
-  if (view === 'search') {
-    renderSearch(main, params);
-  } else if (view === 'library') {
-    renderLibrary(main);
-  } else if (view === 'reader') {
-    state.currentBookId = params.id;
-    renderReader(main, params);
-  }
+  setTimeout(() => {
+    main.innerHTML = '';
+    main.classList.remove('view-exit');
+    main.classList.add('view-enter');
+
+    if (view === 'search') {
+      renderSearch(main, params);
+    } else if (view === 'library') {
+      renderLibrary(main);
+    } else if (view === 'reader') {
+      state.currentBookId = params.id;
+      renderReader(main, params);
+    }
+
+    requestAnimationFrame(() => {
+      main.classList.remove('view-enter');
+    });
+
+    window.scrollTo(0, 0);
+  }, 120);
 }
 
 function handleHashChange() {
