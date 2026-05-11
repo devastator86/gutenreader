@@ -50,7 +50,11 @@ function stripBoilerplate(text) {
   const endMatch = text.match(/\*{3}\s*END OF (?:THIS |THE )?PROJECT GUTENBERG[^\n]*/i);
   const start = startMatch ? text.indexOf(startMatch[0]) + startMatch[0].length : 0;
   const end = endMatch ? text.indexOf(endMatch[0]) : text.length;
-  return text.slice(start, end).trim();
+  let clean = text.slice(start, end).trim();
+  // Strip illustration markers and underscores used for italics
+  clean = clean.replace(/\[Illustration:[^\]]*\]/g, '');
+  clean = clean.replace(/_([^_]+)_/g, '$1');
+  return clean;
 }
 
 function isChapterHeading(line) {
@@ -102,32 +106,16 @@ function calcProgressPercent(article) {
   return Math.min(100, (scrolled / total) * 100);
 }
 
-function calcCharOffset(article) {
-  const children = Array.from(article.children);
-  for (let i = 0; i < children.length; i++) {
-    const r = children[i].getBoundingClientRect();
-    if (r.bottom > 0) {
-      let offset = 0;
-      for (let j = 0; j < i; j++) {
-        offset += (children[j].textContent || '').length + 2;
-      }
-      return offset;
-    }
-  }
-  return 0;
+function calcScrollOffset() {
+  const scrolled = window.scrollY;
+  const total = document.documentElement.scrollHeight - window.innerHeight;
+  return total > 0 ? Math.round((scrolled / total) * 100000) : 0;
 }
 
-function scrollToOffset(article, offset) {
+function scrollToOffset(offset) {
   if (!offset) return;
-  let accumulated = 0;
-  for (const child of article.children) {
-    const len = (child.textContent || '').length + 2;
-    if (accumulated + len >= offset) {
-      child.scrollIntoView({ block: 'start' });
-      return;
-    }
-    accumulated += len;
-  }
+  const total = document.documentElement.scrollHeight - window.innerHeight;
+  window.scrollTo(0, Math.round((offset / 100000) * total));
 }
 
 /* ─── Toolbar ───────────────────────────────────────────────────── */
@@ -355,7 +343,7 @@ async function fetchAndRenderBook(container, bookId) {
   const totalLength = cleanText.length;
   const bodyHtml = parseTextToHtml(cleanText);
   const savedPos = getStoredPosition(bookId);
-  const percentComplete = totalLength > 0 ? Math.round((savedPos / totalLength) * 100 * 10) / 10 : 0;
+  const percentComplete = Math.round((savedPos / 100000) * 1000) / 10;
 
   const currentFont = document.documentElement.dataset.font || 'serif';
 
@@ -403,7 +391,7 @@ async function fetchAndRenderBook(container, bookId) {
 
   // Restore position
   if (savedPos > 0) {
-    requestAnimationFrame(() => scrollToOffset(article, savedPos));
+    requestAnimationFrame(() => scrollToOffset(savedPos));
   }
 
   // Progress bar init
@@ -418,9 +406,9 @@ async function fetchAndRenderBook(container, bookId) {
 
     clearTimeout(scrollTimer);
     scrollTimer = setTimeout(() => {
-      const offset = calcCharOffset(article);
+      const offset = calcScrollOffset();
       savePosition(bookId, offset);
-      const pctComplete = totalLength > 0 ? Math.round((offset / totalLength) * 100 * 10) / 10 : 0;
+      const pctComplete = Math.round((offset / 100000) * 1000) / 10;
       upsertLibraryBook({
         id: bookId,
         title,
