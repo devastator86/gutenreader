@@ -83,6 +83,11 @@ function createSettingsPanel() {
           </div>
         </section>
 
+        <section class="settings-section" id="settings-save-section" style="display:none">
+          <h3 class="settings-section-title">This book</h3>
+          <button class="settings-option-btn" id="settings-save-book" style="width:100%">Save to library</button>
+        </section>
+
         <section class="settings-section settings-section--danger">
           <h3 class="settings-section-title">Data</h3>
           <button class="settings-danger-btn" id="settings-clear-library">Clear library</button>
@@ -141,6 +146,30 @@ function createSettingsPanel() {
   });
 
   return panel;
+}
+
+function showSettingsSaveButton(bookData, onSave) {
+  const panel = createSettingsPanel();
+  const section = panel.querySelector('#settings-save-section');
+  const btn = panel.querySelector('#settings-save-book');
+  if (!section || !btn) return;
+  section.style.display = '';
+  btn.textContent = 'Save to library';
+  btn.classList.remove('active');
+  btn._saveHandler && btn.removeEventListener('click', btn._saveHandler);
+  btn._saveHandler = () => {
+    onSave();
+    btn.textContent = 'Saved';
+    btn.classList.add('active');
+  };
+  btn.addEventListener('click', btn._saveHandler);
+}
+
+function hideSettingsSaveButton() {
+  const panel = document.getElementById('settings-panel');
+  if (!panel) return;
+  const section = panel.querySelector('#settings-save-section');
+  if (section) section.style.display = 'none';
 }
 
 function openSettingsPanel() {

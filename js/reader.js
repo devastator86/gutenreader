@@ -1,7 +1,5 @@
 /* ─── Reader ────────────────────────────────────────────────────── */
 
-const READER_TOOLBAR_HIDE_DELAY = 3000;
-
 /* ─── localStorage helpers ──────────────────────────────────────── */
 
 function getStoredPosition(bookId) {
@@ -138,99 +136,7 @@ function calcProgressPercent() {
   return total > 0 ? Math.min(100, (window.scrollY / total) * 100) : 0;
 }
 
-/* ─── Toolbar ───────────────────────────────────────────────────── */
-
-function buildToolbar(toolbar, toolbarTrigger, bookId, bookData) {
-  function getPrefs() {
-    try { return JSON.parse(localStorage.getItem('gutenreader_prefs') || '{}'); } catch { return {}; }
-  }
-
-  function savePref(key, value) {
-    const prefs = getPrefs();
-    prefs[key] = value;
-    try { localStorage.setItem('gutenreader_prefs', JSON.stringify(prefs)); } catch { /* unavailable */ }
-    if (typeof applyPrefs === 'function') applyPrefs();
-  }
-
-  const trigger = toolbarTrigger;
-  let hideTimer = null;
-
-  function showToolbar() {
-    toolbar.classList.add('visible');
-    clearTimeout(hideTimer);
-    hideTimer = setTimeout(() => toolbar.classList.remove('visible'), READER_TOOLBAR_HIDE_DELAY);
-  }
-
-  function toggleToolbar() {
-    toolbar.classList.contains('visible') ? toolbar.classList.remove('visible') : showToolbar();
-  }
-
-  trigger.addEventListener('click', e => { e.stopPropagation(); toggleToolbar(); });
-  document.addEventListener('click', e => {
-    if (!toolbar.contains(e.target) && e.target !== trigger) {
-      toolbar.classList.remove('visible');
-      clearTimeout(hideTimer);
-    }
-  });
-
-  toolbar.querySelector('[data-action="font-smaller"]').addEventListener('click', () => {
-    const root = document.documentElement;
-    root.dataset.fontSize = root.dataset.fontSize === 'large' ? 'normal' : 'small';
-    savePref('fontSize', root.dataset.fontSize);
-    showToolbar();
-  });
-
-  toolbar.querySelector('[data-action="font-larger"]').addEventListener('click', () => {
-    const root = document.documentElement;
-    root.dataset.fontSize = root.dataset.fontSize === 'small' ? 'normal' : 'large';
-    savePref('fontSize', root.dataset.fontSize);
-    showToolbar();
-  });
-
-  toolbar.querySelectorAll('[data-action="theme"]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const theme = btn.dataset.value;
-      document.documentElement.dataset.theme = theme;
-      savePref('theme', theme);
-      toolbar.querySelectorAll('[data-action="theme"]').forEach(b => b.classList.toggle('active', b.dataset.value === theme));
-      showToolbar();
-    });
-    if (btn.dataset.value === (getPrefs().theme || 'sepia')) btn.classList.add('active');
-  });
-
-  const fontToggle = toolbar.querySelector('[data-action="font-toggle"]');
-  fontToggle.addEventListener('click', () => {
-    const root = document.documentElement;
-    const next = (root.dataset.font || 'serif') === 'serif' ? 'sans' : 'serif';
-    root.dataset.font = next;
-    savePref('font', next);
-    fontToggle.textContent = next === 'serif' ? 'Serif' : 'Sans';
-    showToolbar();
-  });
-
-  toolbar.querySelectorAll('[data-action="width"]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const width = btn.dataset.value;
-      document.documentElement.dataset.lineWidth = width;
-      savePref('lineWidth', width);
-      toolbar.querySelectorAll('[data-action="width"]').forEach(b => b.classList.toggle('active', b.dataset.value === width));
-      showToolbar();
-    });
-    if (btn.dataset.value === (getPrefs().lineWidth || 'normal')) btn.classList.add('active');
-  });
-
-  const saveBtn = toolbar.querySelector('[data-action="save-book"]');
-  if (getLibrary().some(b => b.id === bookId)) {
-    saveBtn.textContent = 'Saved';
-    saveBtn.classList.add('active');
-  }
-  saveBtn.addEventListener('click', () => {
-    upsertLibraryBook(bookData);
-    saveBtn.textContent = 'Saved';
-    saveBtn.classList.add('active');
-    showToolbar();
-  });
-}
+/* ─── Toolbar removed — settings panel handles all reading prefs ─── */
 
 /* ─── Render shell ──────────────────────────────────────────────── */
 
@@ -281,35 +187,6 @@ function createFixedElements(savedPos) {
     <line x1="2" y1="13" x2="14" y2="13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
   </svg>`;
 
-  const toolbarTrigger = document.createElement('button');
-  toolbarTrigger.className = 'reader-toolbar-trigger';
-  toolbarTrigger.setAttribute('aria-label', 'Open reading controls');
-  toolbarTrigger.innerHTML = `<svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
-    <circle cx="9" cy="4" r="1.5" fill="currentColor"/>
-    <circle cx="9" cy="9" r="1.5" fill="currentColor"/>
-    <circle cx="9" cy="14" r="1.5" fill="currentColor"/>
-  </svg>`;
-
-  const toolbar = document.createElement('div');
-  toolbar.className = 'reader-toolbar';
-  toolbar.setAttribute('role', 'toolbar');
-  toolbar.setAttribute('aria-label', 'Reading controls');
-  toolbar.innerHTML = `
-    <button class="toolbar-btn" data-action="font-smaller">A&#x2212; Smaller</button>
-    <button class="toolbar-btn" data-action="font-larger">A+ Larger</button>
-    <div class="toolbar-divider"></div>
-    <button class="toolbar-btn" data-action="theme" data-value="light">Light</button>
-    <button class="toolbar-btn" data-action="theme" data-value="sepia">Sepia</button>
-    <button class="toolbar-btn" data-action="theme" data-value="dark">Dark</button>
-    <div class="toolbar-divider"></div>
-    <button class="toolbar-btn" data-action="font-toggle">${currentFont === 'serif' ? 'Serif' : 'Sans'}</button>
-    <div class="toolbar-divider"></div>
-    <button class="toolbar-btn" data-action="width" data-value="narrow">Narrow</button>
-    <button class="toolbar-btn" data-action="width" data-value="normal">Normal</button>
-    <button class="toolbar-btn" data-action="width" data-value="wide">Wide</button>
-    <div class="toolbar-divider"></div>
-    <button class="toolbar-btn" data-action="save-book">Save to library</button>
-  `;
 
   const jumpBtn = document.createElement('button');
   jumpBtn.className = 'reader-jump-btn hidden';
@@ -332,8 +209,8 @@ function createFixedElements(savedPos) {
   const chapterNavBackdrop = document.createElement('div');
   chapterNavBackdrop.className = 'chapter-nav-backdrop';
 
-  document.body.append(progressBar, contentsBtn, chapterNav, chapterNavBackdrop, toolbarTrigger, toolbar, jumpBtn);
-  return { progressBar, contentsBtn, chapterNav, chapterNavBackdrop, toolbarTrigger, toolbar, jumpBtn };
+  document.body.append(progressBar, contentsBtn, chapterNav, chapterNavBackdrop, jumpBtn);
+  return { progressBar, contentsBtn, chapterNav, chapterNavBackdrop, jumpBtn };
 }
 
 /* ─── Fetch & Render ────────────────────────────────────────────── */
@@ -417,7 +294,7 @@ async function fetchAndRenderBook(container, bookId) {
 
   renderShell(container, title, authorName, bodyHtml);
 
-  const { progressBar, contentsBtn, chapterNav, chapterNavBackdrop, toolbarTrigger, toolbar, jumpBtn } = createFixedElements(savedPos);
+  const { progressBar, contentsBtn, chapterNav, chapterNavBackdrop, jumpBtn } = createFixedElements(savedPos);
 
   const article = container.querySelector('#reader-article');
   const chapterNavList = chapterNav.querySelector('.chapter-nav-list');
@@ -510,13 +387,16 @@ async function fetchAndRenderBook(container, bookId) {
     if (!document.getElementById('reader-view')) {
       window.removeEventListener('scroll', onScroll);
       closeNav();
-      [progressBar, contentsBtn, chapterNav, chapterNavBackdrop, toolbarTrigger, toolbar, jumpBtn].forEach(el => el.remove());
+      [progressBar, contentsBtn, chapterNav, chapterNavBackdrop, jumpBtn].forEach(el => el.remove());
+      if (typeof hideSettingsSaveButton === 'function') hideSettingsSaveButton();
       observer.disconnect();
     }
   });
   observer.observe(document.getElementById('main-content'), { childList: true });
 
-  buildToolbar(toolbar, toolbarTrigger, bookId, bookData);
+  if (typeof showSettingsSaveButton === 'function') {
+    showSettingsSaveButton(bookData, () => upsertLibraryBook(bookData));
+  }
 }
 
 /* ─── Entry Point ───────────────────────────────────────────────── */

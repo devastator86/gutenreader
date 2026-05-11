@@ -181,7 +181,7 @@ body {
 
 .search-hero-title {
   font-family: var(--font-body);
-  font-size: clamp(1.5rem, 4vw, 2.25rem);
+  font-size: clamp(1.95rem, 5.2vw, 2.925rem);
   font-weight: 400;
   color: var(--color-text);
   margin-bottom: var(--space-sm);
@@ -624,6 +624,60 @@ body {
 .settings-danger-btn:hover {
   color: #c0392b;
   border-color: #c0392b;
+}
+
+/* ─── Discovery ─────────────────────────────────────────────────── */
+
+.discovery {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2xl);
+}
+
+.discovery-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.discovery-title {
+  font-family: var(--font-ui);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.discovery-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+}
+
+.discovery-chip {
+  font-family: var(--font-ui);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  color: var(--color-text-muted);
+  padding: var(--space-xs) var(--space-md);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  background-color: var(--color-bg-card);
+  transition: color var(--transition-fast), border-color var(--transition-fast), background-color var(--transition-fast);
+  white-space: nowrap;
+}
+
+.discovery-chip:hover {
+  color: var(--color-accent);
+  border-color: var(--color-accent);
+  background-color: color-mix(in srgb, var(--color-accent) 6%, var(--color-bg));
+}
+
+.discovery-books .book-grid {
+  overflow-x: auto;
+  flex-wrap: nowrap;
+  padding-bottom: var(--space-sm);
 }
 
 /* ─── Desktop ────────────────────────────────────────────────────── */
