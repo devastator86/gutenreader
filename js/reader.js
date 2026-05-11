@@ -334,7 +334,8 @@ async function fetchAndRenderBook(container, bookId) {
 
   let rawText = '';
   try {
-    const textRes = await fetch(textUrl);
+    const proxied = `https://corsproxy.io/?url=${encodeURIComponent(textUrl)}`;
+    const textRes = await fetch(proxied);
     if (!textRes.ok) throw new Error('Text fetch failed');
     rawText = await textRes.text();
   } catch {
