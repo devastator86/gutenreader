@@ -113,7 +113,9 @@ function buildChapterNavFromArticle(article) {
   if (headings.length < 2) return null;
 
   return headings.map(h => {
-    const label = h.textContent.trim().replace(/\s+/g, ' ') || h.id;
+    const clone = h.cloneNode(true);
+    clone.querySelectorAll('img').forEach(img => img.remove());
+    const label = clone.textContent.trim().replace(/\s+/g, ' ') || h.id;
     return `<a href="#${h.id}" class="chapter-nav-item" data-target="${h.id}">${escapeHtml(label)}</a>`;
   }).join('');
 }
@@ -270,14 +272,6 @@ function renderShell(container, title, authorName, bodyHtml, savedPos) {
       </div>
     </div>
 
-    <button class="reader-contents-btn" id="reader-contents-btn" aria-label="Table of contents" aria-expanded="false">
-      <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
-        <line x1="2" y1="5" x2="16" y2="5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-        <line x1="2" y1="9" x2="12" y2="9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-        <line x1="2" y1="13" x2="14" y2="13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-      </svg>
-    </button>
-
     <button class="reader-toolbar-trigger" aria-label="Open reading controls">
       <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
         <circle cx="9" cy="4" r="1.5" fill="currentColor"/>
@@ -391,13 +385,26 @@ async function fetchAndRenderBook(container, bookId) {
 
   renderShell(container, title, authorName, bodyHtml, savedPos);
 
+  // Inject contents button directly into body so transform on #main-content
+  // does not trap its fixed positioning
+  const contentsBtn = document.createElement('button');
+  contentsBtn.className = 'reader-contents-btn';
+  contentsBtn.id = 'reader-contents-btn';
+  contentsBtn.setAttribute('aria-label', 'Table of contents');
+  contentsBtn.setAttribute('aria-expanded', 'false');
+  contentsBtn.innerHTML = `<svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
+    <line x1="2" y1="5" x2="16" y2="5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+    <line x1="2" y1="9" x2="12" y2="9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+    <line x1="2" y1="13" x2="14" y2="13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+  </svg>`;
+  document.body.appendChild(contentsBtn);
+
   const article = container.querySelector('#reader-article');
   const progressBar = container.querySelector('#reader-progress-bar');
   const chapterNav = container.querySelector('#chapter-nav');
   const chapterNavList = container.querySelector('#chapter-nav-list');
   const chapterNavClose = container.querySelector('#chapter-nav-close');
   const chapterNavBackdrop = container.querySelector('#chapter-nav-backdrop');
-  const contentsBtn = container.querySelector('#reader-contents-btn');
 
   // Build chapter nav after article is in DOM
   const navHtml = buildChapterNavFromArticle(article);
@@ -483,6 +490,7 @@ async function fetchAndRenderBook(container, bookId) {
     if (!document.getElementById('reader-view')) {
       window.removeEventListener('scroll', onScroll);
       closeNav();
+      contentsBtn.remove();
       observer.disconnect();
     }
   });
