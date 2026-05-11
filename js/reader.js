@@ -114,7 +114,7 @@ function buildChapterNavFromArticle(article) {
 
   return headings.map(h => {
     const clone = h.cloneNode(true);
-    clone.querySelectorAll('img').forEach(img => img.remove());
+    clone.querySelectorAll('img, .caption, .figcenter, .figleft, .figright').forEach(el => el.remove());
     const label = clone.textContent.trim().replace(/\s+/g, ' ') || h.id;
     return `<a href="#${h.id}" class="chapter-nav-item" data-target="${h.id}">${escapeHtml(label)}</a>`;
   }).join('');
@@ -140,7 +140,7 @@ function calcProgressPercent() {
 
 /* ─── Toolbar ───────────────────────────────────────────────────── */
 
-function buildToolbar(container, bookId, bookData) {
+function buildToolbar(toolbar, toolbarTrigger, bookId, bookData) {
   function getPrefs() {
     try { return JSON.parse(localStorage.getItem('gutenreader_prefs') || '{}'); } catch { return {}; }
   }
@@ -152,8 +152,7 @@ function buildToolbar(container, bookId, bookData) {
     if (typeof applyPrefs === 'function') applyPrefs();
   }
 
-  const toolbar = container.querySelector('.reader-toolbar');
-  const trigger = container.querySelector('.reader-toolbar-trigger');
+  const trigger = toolbarTrigger;
   let hideTimer = null;
 
   function showToolbar() {
@@ -174,52 +173,53 @@ function buildToolbar(container, bookId, bookData) {
     }
   });
 
-  container.querySelector('[data-action="font-smaller"]').addEventListener('click', () => {
+  toolbar.querySelector('[data-action="font-smaller"]').addEventListener('click', () => {
     const root = document.documentElement;
     root.dataset.fontSize = root.dataset.fontSize === 'large' ? 'normal' : 'small';
     savePref('fontSize', root.dataset.fontSize);
     showToolbar();
   });
 
-  container.querySelector('[data-action="font-larger"]').addEventListener('click', () => {
+  toolbar.querySelector('[data-action="font-larger"]').addEventListener('click', () => {
     const root = document.documentElement;
     root.dataset.fontSize = root.dataset.fontSize === 'small' ? 'normal' : 'large';
     savePref('fontSize', root.dataset.fontSize);
     showToolbar();
   });
 
-  container.querySelectorAll('[data-action="theme"]').forEach(btn => {
+  toolbar.querySelectorAll('[data-action="theme"]').forEach(btn => {
     btn.addEventListener('click', () => {
       const theme = btn.dataset.value;
       document.documentElement.dataset.theme = theme;
       savePref('theme', theme);
-      container.querySelectorAll('[data-action="theme"]').forEach(b => b.classList.toggle('active', b.dataset.value === theme));
+      toolbar.querySelectorAll('[data-action="theme"]').forEach(b => b.classList.toggle('active', b.dataset.value === theme));
       showToolbar();
     });
     if (btn.dataset.value === (getPrefs().theme || 'sepia')) btn.classList.add('active');
   });
 
-  container.querySelector('[data-action="font-toggle"]').addEventListener('click', () => {
+  const fontToggle = toolbar.querySelector('[data-action="font-toggle"]');
+  fontToggle.addEventListener('click', () => {
     const root = document.documentElement;
     const next = (root.dataset.font || 'serif') === 'serif' ? 'sans' : 'serif';
     root.dataset.font = next;
     savePref('font', next);
-    container.querySelector('[data-action="font-toggle"]').textContent = next === 'serif' ? 'Serif' : 'Sans';
+    fontToggle.textContent = next === 'serif' ? 'Serif' : 'Sans';
     showToolbar();
   });
 
-  container.querySelectorAll('[data-action="width"]').forEach(btn => {
+  toolbar.querySelectorAll('[data-action="width"]').forEach(btn => {
     btn.addEventListener('click', () => {
       const width = btn.dataset.value;
       document.documentElement.dataset.lineWidth = width;
       savePref('lineWidth', width);
-      container.querySelectorAll('[data-action="width"]').forEach(b => b.classList.toggle('active', b.dataset.value === width));
+      toolbar.querySelectorAll('[data-action="width"]').forEach(b => b.classList.toggle('active', b.dataset.value === width));
       showToolbar();
     });
     if (btn.dataset.value === (getPrefs().lineWidth || 'normal')) btn.classList.add('active');
   });
 
-  const saveBtn = container.querySelector('[data-action="save-book"]');
+  const saveBtn = toolbar.querySelector('[data-action="save-book"]');
   if (getLibrary().some(b => b.id === bookId)) {
     saveBtn.textContent = 'Saved';
     saveBtn.classList.add('active');
@@ -234,25 +234,9 @@ function buildToolbar(container, bookId, bookData) {
 
 /* ─── Render shell ──────────────────────────────────────────────── */
 
-function renderShell(container, title, authorName, bodyHtml, savedPos) {
-  const percentComplete = Math.round((savedPos / 100000) * 1000) / 10;
-  const currentFont = document.documentElement.dataset.font || 'serif';
-
+function renderShell(container, title, authorName, bodyHtml) {
   container.innerHTML = `
     <div class="reader-layout" id="reader-view">
-      <div class="reader-progress-bar" id="reader-progress-bar" role="progressbar" aria-valuenow="${percentComplete}" aria-valuemin="0" aria-valuemax="100"></div>
-
-      <nav class="chapter-nav" id="chapter-nav" aria-label="Chapter navigation">
-        <div class="chapter-nav-header">
-          <span class="chapter-nav-title">Contents</span>
-          <button class="chapter-nav-close" id="chapter-nav-close" aria-label="Close contents">&#x2715;</button>
-        </div>
-        <div class="chapter-nav-list" id="chapter-nav-list">
-          <p class="chapter-nav-loading">Loading contents&hellip;</p>
-        </div>
-      </nav>
-      <div class="chapter-nav-backdrop" id="chapter-nav-backdrop"></div>
-
       <div class="reader-main">
         <div class="reader-topbar">
           <a href="#search" class="reader-back">
@@ -271,37 +255,85 @@ function renderShell(container, title, authorName, bodyHtml, savedPos) {
         </article>
       </div>
     </div>
+  `;
+}
 
-    <button class="reader-toolbar-trigger" aria-label="Open reading controls">
-      <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
-        <circle cx="9" cy="4" r="1.5" fill="currentColor"/>
-        <circle cx="9" cy="9" r="1.5" fill="currentColor"/>
-        <circle cx="9" cy="14" r="1.5" fill="currentColor"/>
-      </svg>
-    </button>
+function createFixedElements(savedPos) {
+  const percentComplete = Math.round((savedPos / 100000) * 1000) / 10;
+  const currentFont = document.documentElement.dataset.font || 'serif';
 
-    <button class="reader-jump-btn hidden" id="reader-jump-btn" aria-label="Jump to first chapter">
-      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M7 2v10M2 7l5 5 5-5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      Jump to Chapter I
-    </button>
+  const progressBar = document.createElement('div');
+  progressBar.className = 'reader-progress-bar';
+  progressBar.id = 'reader-progress-bar';
+  progressBar.setAttribute('role', 'progressbar');
+  progressBar.setAttribute('aria-valuenow', String(percentComplete));
+  progressBar.setAttribute('aria-valuemin', '0');
+  progressBar.setAttribute('aria-valuemax', '100');
+  progressBar.style.width = `${percentComplete}%`;
 
-    <div class="reader-toolbar" role="toolbar" aria-label="Reading controls">
-      <button class="toolbar-btn" data-action="font-smaller">A&#x2212; Smaller</button>
-      <button class="toolbar-btn" data-action="font-larger">A+ Larger</button>
-      <div class="toolbar-divider"></div>
-      <button class="toolbar-btn" data-action="theme" data-value="light">Light</button>
-      <button class="toolbar-btn" data-action="theme" data-value="sepia">Sepia</button>
-      <button class="toolbar-btn" data-action="theme" data-value="dark">Dark</button>
-      <div class="toolbar-divider"></div>
-      <button class="toolbar-btn" data-action="font-toggle">${currentFont === 'serif' ? 'Serif' : 'Sans'}</button>
-      <div class="toolbar-divider"></div>
-      <button class="toolbar-btn" data-action="width" data-value="narrow">Narrow</button>
-      <button class="toolbar-btn" data-action="width" data-value="normal">Normal</button>
-      <button class="toolbar-btn" data-action="width" data-value="wide">Wide</button>
-      <div class="toolbar-divider"></div>
-      <button class="toolbar-btn" data-action="save-book">Save to library</button>
+  const contentsBtn = document.createElement('button');
+  contentsBtn.className = 'reader-contents-btn';
+  contentsBtn.setAttribute('aria-label', 'Table of contents');
+  contentsBtn.setAttribute('aria-expanded', 'false');
+  contentsBtn.innerHTML = `<svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
+    <line x1="2" y1="5" x2="16" y2="5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+    <line x1="2" y1="9" x2="12" y2="9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+    <line x1="2" y1="13" x2="14" y2="13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+  </svg>`;
+
+  const toolbarTrigger = document.createElement('button');
+  toolbarTrigger.className = 'reader-toolbar-trigger';
+  toolbarTrigger.setAttribute('aria-label', 'Open reading controls');
+  toolbarTrigger.innerHTML = `<svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
+    <circle cx="9" cy="4" r="1.5" fill="currentColor"/>
+    <circle cx="9" cy="9" r="1.5" fill="currentColor"/>
+    <circle cx="9" cy="14" r="1.5" fill="currentColor"/>
+  </svg>`;
+
+  const toolbar = document.createElement('div');
+  toolbar.className = 'reader-toolbar';
+  toolbar.setAttribute('role', 'toolbar');
+  toolbar.setAttribute('aria-label', 'Reading controls');
+  toolbar.innerHTML = `
+    <button class="toolbar-btn" data-action="font-smaller">A&#x2212; Smaller</button>
+    <button class="toolbar-btn" data-action="font-larger">A+ Larger</button>
+    <div class="toolbar-divider"></div>
+    <button class="toolbar-btn" data-action="theme" data-value="light">Light</button>
+    <button class="toolbar-btn" data-action="theme" data-value="sepia">Sepia</button>
+    <button class="toolbar-btn" data-action="theme" data-value="dark">Dark</button>
+    <div class="toolbar-divider"></div>
+    <button class="toolbar-btn" data-action="font-toggle">${currentFont === 'serif' ? 'Serif' : 'Sans'}</button>
+    <div class="toolbar-divider"></div>
+    <button class="toolbar-btn" data-action="width" data-value="narrow">Narrow</button>
+    <button class="toolbar-btn" data-action="width" data-value="normal">Normal</button>
+    <button class="toolbar-btn" data-action="width" data-value="wide">Wide</button>
+    <div class="toolbar-divider"></div>
+    <button class="toolbar-btn" data-action="save-book">Save to library</button>
+  `;
+
+  const jumpBtn = document.createElement('button');
+  jumpBtn.className = 'reader-jump-btn hidden';
+  jumpBtn.setAttribute('aria-label', 'Jump to first chapter');
+  jumpBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M7 2v10M2 7l5 5 5-5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Jump to Chapter I`;
+
+  const chapterNav = document.createElement('nav');
+  chapterNav.className = 'chapter-nav';
+  chapterNav.setAttribute('aria-label', 'Chapter navigation');
+  chapterNav.innerHTML = `
+    <div class="chapter-nav-header">
+      <span class="chapter-nav-title">Contents</span>
+      <button class="chapter-nav-close" aria-label="Close contents">&#x2715;</button>
+    </div>
+    <div class="chapter-nav-list">
+      <p class="chapter-nav-loading">Loading contents&hellip;</p>
     </div>
   `;
+
+  const chapterNavBackdrop = document.createElement('div');
+  chapterNavBackdrop.className = 'chapter-nav-backdrop';
+
+  document.body.append(progressBar, contentsBtn, chapterNav, chapterNavBackdrop, toolbarTrigger, toolbar, jumpBtn);
+  return { progressBar, contentsBtn, chapterNav, chapterNavBackdrop, toolbarTrigger, toolbar, jumpBtn };
 }
 
 /* ─── Fetch & Render ────────────────────────────────────────────── */
@@ -383,28 +415,13 @@ async function fetchAndRenderBook(container, bookId) {
     percentComplete,
   };
 
-  renderShell(container, title, authorName, bodyHtml, savedPos);
+  renderShell(container, title, authorName, bodyHtml);
 
-  // Inject contents button directly into body so transform on #main-content
-  // does not trap its fixed positioning
-  const contentsBtn = document.createElement('button');
-  contentsBtn.className = 'reader-contents-btn';
-  contentsBtn.id = 'reader-contents-btn';
-  contentsBtn.setAttribute('aria-label', 'Table of contents');
-  contentsBtn.setAttribute('aria-expanded', 'false');
-  contentsBtn.innerHTML = `<svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
-    <line x1="2" y1="5" x2="16" y2="5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-    <line x1="2" y1="9" x2="12" y2="9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-    <line x1="2" y1="13" x2="14" y2="13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-  </svg>`;
-  document.body.appendChild(contentsBtn);
+  const { progressBar, contentsBtn, chapterNav, chapterNavBackdrop, toolbarTrigger, toolbar, jumpBtn } = createFixedElements(savedPos);
 
   const article = container.querySelector('#reader-article');
-  const progressBar = container.querySelector('#reader-progress-bar');
-  const chapterNav = container.querySelector('#chapter-nav');
-  const chapterNavList = container.querySelector('#chapter-nav-list');
-  const chapterNavClose = container.querySelector('#chapter-nav-close');
-  const chapterNavBackdrop = container.querySelector('#chapter-nav-backdrop');
+  const chapterNavList = chapterNav.querySelector('.chapter-nav-list');
+  const chapterNavClose = chapterNav.querySelector('.chapter-nav-close');
 
   // Build chapter nav after article is in DOM
   const navHtml = buildChapterNavFromArticle(article);
@@ -423,14 +440,18 @@ async function fetchAndRenderBook(container, bookId) {
   }
 
   // Jump-to-chapter button: show if first chapter heading is not near the top
-  const jumpBtn = container.querySelector('#reader-jump-btn');
   const chapterPattern = /^(chapter|chap\.?\s*[ivxlcdm\d]|part\s+[ivxlcdm\d])/i;
   const firstChapterH2 = Array.from(article.querySelectorAll('h2[id]')).find(h =>
     chapterPattern.test(h.textContent.trim())
   );
-  if (firstChapterH2 && firstChapterH2.offsetTop > window.innerHeight * 1.5) {
-    const label = firstChapterH2.textContent.trim().replace(/\s+/g, ' ').slice(0, 30);
-    jumpBtn.lastChild.textContent = ` Jump to ${label}`;
+  const allH2s = Array.from(article.querySelectorAll('h2[id]'));
+  const firstChapterIndex = allH2s.indexOf(firstChapterH2);
+  const hasPreamble = firstChapterH2 && firstChapterIndex > 0;
+  if (hasPreamble) {
+    const clone2 = firstChapterH2.cloneNode(true);
+    clone2.querySelectorAll('img, .caption').forEach(el => el.remove());
+    const label = clone2.textContent.trim().replace(/\s+/g, ' ').slice(0, 30);
+    jumpBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M7 2v10M2 7l5 5 5-5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg> ${escapeHtml(label)}`;
     jumpBtn.classList.remove('hidden');
     jumpBtn.addEventListener('click', () => {
       firstChapterH2.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -463,7 +484,6 @@ async function fetchAndRenderBook(container, bookId) {
   chapterNavClose.addEventListener('click', closeNav);
   chapterNavBackdrop.addEventListener('click', closeNav);
 
-  progressBar.style.width = `${percentComplete}%`;
   if (savedPos > 0) requestAnimationFrame(() => scrollToOffset(savedPos));
 
   let scrollTimer = null;
@@ -490,13 +510,13 @@ async function fetchAndRenderBook(container, bookId) {
     if (!document.getElementById('reader-view')) {
       window.removeEventListener('scroll', onScroll);
       closeNav();
-      contentsBtn.remove();
+      [progressBar, contentsBtn, chapterNav, chapterNavBackdrop, toolbarTrigger, toolbar, jumpBtn].forEach(el => el.remove());
       observer.disconnect();
     }
   });
   observer.observe(document.getElementById('main-content'), { childList: true });
 
-  buildToolbar(container, bookId, bookData);
+  buildToolbar(toolbar, toolbarTrigger, bookId, bookData);
 }
 
 /* ─── Entry Point ───────────────────────────────────────────────── */

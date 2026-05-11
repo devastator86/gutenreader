@@ -84,6 +84,9 @@ function handleHashChange() {
     return;
   }
 
+  // Ignore in-page anchor fragments (e.g. TOC links like #CHAPTER_II)
+  if (state.currentView === 'reader') return;
+
   navigate('search');
 }
 
