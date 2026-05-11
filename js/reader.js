@@ -281,13 +281,26 @@ async function fetchAndRenderBook(container, bookId) {
     return;
   }
 
+  function toHttps(url) {
+    return url ? url.replace(/^http:\/\//i, 'https://') : url;
+  }
+
+  function pickTextUrl(formats) {
+    const candidates = [
+      formats['text/plain; charset=utf-8'],
+      formats['text/plain'],
+    ];
+    for (const url of candidates) {
+      if (url && !url.endsWith('.zip')) return toHttps(url);
+    }
+    return null;
+  }
+
   const title = bookMeta.title || 'Untitled';
   const authors = bookMeta.authors || [];
   const authorName = authors.length ? authors.map(a => a.name).join(', ') : 'Unknown author';
-  const coverUrl = bookMeta.formats['image/jpeg'] || '';
-  const textUrl = bookMeta.formats['text/plain; charset=utf-8']
-    || bookMeta.formats['text/plain']
-    || null;
+  const coverUrl = toHttps(bookMeta.formats['image/jpeg'] || '');
+  const textUrl = pickTextUrl(bookMeta.formats);
 
   if (!textUrl) {
     main.innerHTML = `
