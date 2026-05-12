@@ -124,10 +124,18 @@ function renderDiscovery() {
     <div class="discovery">
       <section class="discovery-section">
         <h2 class="discovery-title">Most popular</h2>
-        <div class="discovery-books" id="popular-books">
-          <div class="state-block" role="status">
-            <div class="spinner" aria-hidden="true"></div>
+        <div class="discovery-books-wrap">
+          <button class="discovery-books-arrow discovery-books-arrow--left hidden" id="popular-arrow-left" aria-label="Scroll left">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M10 3L5 8l5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+          <div class="discovery-books" id="popular-books">
+            <div class="state-block" role="status">
+              <div class="spinner" aria-hidden="true"></div>
+            </div>
           </div>
+          <button class="discovery-books-arrow discovery-books-arrow--right hidden" id="popular-arrow-right" aria-label="Scroll right">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M6 3l5 5-5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
         </div>
       </section>
       <section class="discovery-section">
@@ -288,6 +296,26 @@ function initSearch(container, params) {
       row.innerHTML = data.results.slice(0, 10).map(renderBookCardCompact).join('');
       el.innerHTML = '';
       el.appendChild(row);
+
+      const arrowLeft = results.querySelector('#popular-arrow-left');
+      const arrowRight = results.querySelector('#popular-arrow-right');
+      const cardWidth = 100 + 16; // card width + gap
+
+      function updateArrows() {
+        const atStart = el.scrollLeft <= 4;
+        const atEnd = el.scrollLeft >= el.scrollWidth - el.clientWidth - 4;
+        arrowLeft.classList.toggle('hidden', atStart);
+        arrowRight.classList.toggle('hidden', atEnd);
+      }
+
+      arrowLeft.addEventListener('click', () => {
+        el.scrollBy({ left: -cardWidth * 3, behavior: 'smooth' });
+      });
+      arrowRight.addEventListener('click', () => {
+        el.scrollBy({ left: cardWidth * 3, behavior: 'smooth' });
+      });
+      el.addEventListener('scroll', updateArrows, { passive: true });
+      updateArrows();
     }).catch(() => {
       const el = results.querySelector('#popular-books');
       if (el) el.innerHTML = '';

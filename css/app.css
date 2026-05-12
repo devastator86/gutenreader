@@ -674,6 +674,10 @@ body {
   background-color: color-mix(in srgb, var(--color-accent) 6%, var(--color-bg));
 }
 
+.discovery-books-wrap {
+  position: relative;
+}
+
 .discovery-books {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
@@ -691,6 +695,42 @@ body {
   flex-direction: row;
   gap: var(--space-md);
   width: max-content;
+}
+
+.discovery-books-arrow {
+  position: absolute;
+  top: 0;
+  bottom: var(--space-sm);
+  width: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(to right, var(--color-bg) 40%, transparent);
+  border: none;
+  cursor: pointer;
+  color: var(--color-text-muted);
+  z-index: 2;
+  transition: color var(--transition-fast), opacity var(--transition-fast);
+  opacity: 1;
+}
+
+.discovery-books-arrow:hover {
+  color: var(--color-accent);
+}
+
+.discovery-books-arrow--left {
+  left: 0;
+  background: linear-gradient(to right, var(--color-bg) 40%, transparent);
+}
+
+.discovery-books-arrow--right {
+  right: 0;
+  background: linear-gradient(to left, var(--color-bg) 40%, transparent);
+}
+
+.discovery-books-arrow.hidden {
+  opacity: 0;
+  pointer-events: none;
 }
 
 .book-card--compact {
