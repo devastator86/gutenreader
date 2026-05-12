@@ -674,10 +674,42 @@ body {
   background-color: color-mix(in srgb, var(--color-accent) 6%, var(--color-bg));
 }
 
-.discovery-books .book-grid {
+.discovery-books {
   overflow-x: auto;
-  flex-wrap: nowrap;
-  padding-bottom: var(--space-sm);
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  margin: 0 calc(-1 * var(--space-lg));
+  padding: 0 var(--space-lg) var(--space-sm);
+}
+
+.discovery-books::-webkit-scrollbar {
+  display: none;
+}
+
+.discovery-books-row {
+  display: flex;
+  flex-direction: row;
+  gap: var(--space-md);
+  width: max-content;
+}
+
+.book-card--compact {
+  flex-direction: column;
+  gap: var(--space-sm);
+  padding: var(--space-sm);
+  width: 100px;
+  align-items: flex-start;
+}
+
+.book-card--compact .book-cover {
+  width: 100%;
+  height: 136px;
+}
+
+.book-card--compact .book-title {
+  font-size: 0.75rem;
+  font-weight: 500;
+  -webkit-line-clamp: 3;
 }
 
 /* ─── Desktop ────────────────────────────────────────────────────── */

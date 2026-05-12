@@ -153,9 +153,15 @@ function showSettingsSaveButton(bookData, onSave) {
   const section = panel.querySelector('#settings-save-section');
   const btn = panel.querySelector('#settings-save-book');
   if (!section || !btn) return;
-  section.style.display = '';
-  btn.textContent = 'Save to library';
-  btn.classList.remove('active');
+  section.style.display = 'block';
+  const alreadySaved = (() => {
+    try {
+      const lib = JSON.parse(localStorage.getItem('gutenreader_library') || '[]');
+      return lib.some(b => b.id === bookData.id);
+    } catch { return false; }
+  })();
+  btn.textContent = alreadySaved ? 'Saved' : 'Save to library';
+  btn.classList.toggle('active', alreadySaved);
   btn._saveHandler && btn.removeEventListener('click', btn._saveHandler);
   btn._saveHandler = () => {
     onSave();

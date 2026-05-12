@@ -88,6 +88,29 @@ const AUTHORS = [
   'Edgar Allan Poe', 'H.G. Wells', 'Jules Verne',
 ];
 
+function renderBookCardCompact(book) {
+  const cover = getCoverUrl(book.formats);
+  const author = getAuthorName(book.authors);
+
+  const coverHtml = cover
+    ? `<img src="${escapeHtml(cover)}" alt="" loading="lazy">`
+    : `<div class="book-cover-placeholder" aria-hidden="true">&#x1F4D6;</div>`;
+
+  return `
+    <button
+      class="book-card book-card--compact"
+      data-id="${book.id}"
+      data-title="${escapeHtml(book.title)}"
+      data-author="${escapeHtml(author)}"
+      data-cover="${cover ? escapeHtml(cover) : ''}"
+      aria-label="Open ${escapeHtml(book.title)} by ${escapeHtml(author)}"
+    >
+      <div class="book-cover">${coverHtml}</div>
+      <span class="book-title">${escapeHtml(book.title)}</span>
+    </button>
+  `;
+}
+
 function renderDiscovery() {
   const genreChips = GENRES.map(g =>
     `<button class="discovery-chip" data-type="genre" data-topic="${escapeHtml(g.topic)}">${escapeHtml(g.label)}</button>`
@@ -260,7 +283,11 @@ function initSearch(container, params) {
         el.innerHTML = '';
         return;
       }
-      el.innerHTML = renderResults(data.results.slice(0, 10));
+      const row = document.createElement('div');
+      row.className = 'discovery-books-row';
+      row.innerHTML = data.results.slice(0, 10).map(renderBookCardCompact).join('');
+      el.innerHTML = '';
+      el.appendChild(row);
     }).catch(() => {
       const el = results.querySelector('#popular-books');
       if (el) el.innerHTML = '';
