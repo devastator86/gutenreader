@@ -123,19 +123,21 @@ function renderDiscovery() {
   return `
     <div class="discovery">
       <section class="discovery-section">
-        <h2 class="discovery-title">Most popular</h2>
-        <div class="discovery-books-wrap">
-          <button class="discovery-books-arrow discovery-books-arrow--left hidden" id="popular-arrow-left" aria-label="Scroll left">
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M10 3L5 8l5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <div class="discovery-section-header">
+          <h2 class="discovery-title">Most popular</h2>
+          <button class="discovery-books-arrow hidden" id="popular-arrow-left" aria-label="Scroll left">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M10 3L5 8l5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
           </button>
+          <button class="discovery-books-arrow hidden" id="popular-arrow-right" aria-label="Scroll right">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M6 3l5 5-5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+        </div>
+        <div class="discovery-books-wrap">
           <div class="discovery-books" id="popular-books">
             <div class="state-block" role="status">
               <div class="spinner" aria-hidden="true"></div>
             </div>
           </div>
-          <button class="discovery-books-arrow discovery-books-arrow--right hidden" id="popular-arrow-right" aria-label="Scroll right">
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M6 3l5 5-5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          </button>
         </div>
       </section>
       <section class="discovery-section">

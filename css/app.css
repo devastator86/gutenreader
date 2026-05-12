@@ -181,7 +181,7 @@ body {
 
 .search-hero-title {
   font-family: var(--font-body);
-  font-size: clamp(1.95rem, 5.2vw, 2.925rem);
+  font-size: clamp(2.925rem, 7.8vw, 4.39rem);
   font-weight: 400;
   color: var(--color-text);
   margin-bottom: var(--space-sm);
@@ -674,9 +674,6 @@ body {
   background-color: color-mix(in srgb, var(--color-accent) 6%, var(--color-bg));
 }
 
-.discovery-books-wrap {
-  position: relative;
-}
 
 .discovery-books {
   overflow-x: auto;
@@ -697,35 +694,34 @@ body {
   width: max-content;
 }
 
+.discovery-section-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.discovery-section-header .discovery-title {
+  flex: 1;
+}
+
 .discovery-books-arrow {
-  position: absolute;
-  top: 0;
-  bottom: var(--space-sm);
-  width: 40px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(to right, var(--color-bg) 40%, transparent);
-  border: none;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-card);
   cursor: pointer;
   color: var(--color-text-muted);
-  z-index: 2;
-  transition: color var(--transition-fast), opacity var(--transition-fast);
-  opacity: 1;
+  flex-shrink: 0;
+  transition: color var(--transition-fast), border-color var(--transition-fast), opacity var(--transition-fast);
 }
 
 .discovery-books-arrow:hover {
   color: var(--color-accent);
-}
-
-.discovery-books-arrow--left {
-  left: 0;
-  background: linear-gradient(to right, var(--color-bg) 40%, transparent);
-}
-
-.discovery-books-arrow--right {
-  right: 0;
-  background: linear-gradient(to left, var(--color-bg) 40%, transparent);
+  border-color: var(--color-accent);
 }
 
 .discovery-books-arrow.hidden {
