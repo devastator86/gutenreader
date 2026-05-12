@@ -209,8 +209,12 @@ function createFixedElements(savedPos) {
   const chapterNavBackdrop = document.createElement('div');
   chapterNavBackdrop.className = 'chapter-nav-backdrop';
 
-  document.body.append(progressBar, contentsBtn, chapterNav, chapterNavBackdrop, jumpBtn);
-  return { progressBar, contentsBtn, chapterNav, chapterNavBackdrop, jumpBtn };
+  const timeLabel = document.createElement('div');
+  timeLabel.className = 'reader-time-label';
+  timeLabel.id = 'reader-time-label';
+
+  document.body.append(progressBar, contentsBtn, chapterNav, chapterNavBackdrop, jumpBtn, timeLabel);
+  return { progressBar, contentsBtn, chapterNav, chapterNavBackdrop, jumpBtn, timeLabel };
 }
 
 /* ─── Fetch & Render ────────────────────────────────────────────── */
@@ -294,7 +298,7 @@ async function fetchAndRenderBook(container, bookId) {
 
   renderShell(container, title, authorName, bodyHtml);
 
-  const { progressBar, contentsBtn, chapterNav, chapterNavBackdrop, jumpBtn } = createFixedElements(savedPos);
+  const { progressBar, contentsBtn, chapterNav, chapterNavBackdrop, jumpBtn, timeLabel } = createFixedElements(savedPos);
 
   const article = container.querySelector('#reader-article');
   const chapterNavList = chapterNav.querySelector('.chapter-nav-list');
@@ -310,6 +314,13 @@ async function fetchAndRenderBook(container, bookId) {
         const target = document.getElementById(link.dataset.target);
         if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
         closeNav();
+        // Save immediately — user may not scroll after jumping to a chapter
+        setTimeout(() => {
+          const offset = calcScrollOffset();
+          savePosition(bookId, offset);
+          const pct2 = Math.round((offset / 100000) * 1000) / 10;
+          upsertLibraryBook({ ...bookData, position: offset, percentComplete: pct2, savedAt: Date.now() });
+        }, 600);
       });
     });
   } else {
@@ -363,6 +374,9 @@ async function fetchAndRenderBook(container, bookId) {
 
   if (savedPos > 0) requestAnimationFrame(() => scrollToOffset(savedPos));
 
+  const totalChars = article.textContent.length;
+  const charsPerMin = 1500;
+
   let scrollTimer = null;
   let lastPct = -1;
   function onScroll() {
@@ -371,6 +385,17 @@ async function fetchAndRenderBook(container, bookId) {
       progressBar.style.width = `${pct}%`;
       progressBar.setAttribute('aria-valuenow', pct.toFixed(1));
       lastPct = pct;
+
+      const remaining = totalChars * (1 - pct / 100);
+      const minsLeft = Math.round(remaining / charsPerMin);
+      if (pct >= 1 && minsLeft > 0) {
+        timeLabel.textContent = minsLeft < 60
+          ? `~${minsLeft} min left`
+          : `~${Math.round(minsLeft / 60)} hr left`;
+        timeLabel.classList.add('visible');
+      } else {
+        timeLabel.classList.remove('visible');
+      }
     }
     clearTimeout(scrollTimer);
     scrollTimer = setTimeout(() => {
@@ -387,7 +412,7 @@ async function fetchAndRenderBook(container, bookId) {
     if (!document.getElementById('reader-view')) {
       window.removeEventListener('scroll', onScroll);
       closeNav();
-      [progressBar, contentsBtn, chapterNav, chapterNavBackdrop, jumpBtn].forEach(el => el.remove());
+      [progressBar, contentsBtn, chapterNav, chapterNavBackdrop, jumpBtn, timeLabel].forEach(el => el.remove());
       if (typeof hideSettingsSaveButton === 'function') hideSettingsSaveButton();
       observer.disconnect();
     }

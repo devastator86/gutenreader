@@ -25,6 +25,25 @@
   transition: width 0.3s ease;
 }
 
+/* Reading time indicator */
+.reader-time-label {
+  position: fixed;
+  top: calc(var(--header-height) + 6px);
+  right: var(--space-md);
+  font-family: var(--font-ui);
+  font-size: 0.7rem;
+  color: var(--color-text-muted);
+  opacity: 0;
+  transition: opacity var(--transition-base);
+  z-index: 90;
+  pointer-events: none;
+  letter-spacing: 0.02em;
+}
+
+.reader-time-label.visible {
+  opacity: 1;
+}
+
 /* ─── Top bar (back link only) ───────────────────────────────────── */
 
 .reader-topbar {

@@ -245,11 +245,68 @@ function initSearch(container, params) {
     results.innerHTML = html;
   }
 
+  let nextPageUrl = null;
+  let shownCount = 0;
+  let totalCount = 0;
+
+  function updateStatus() {
+    if (shownCount > 0) {
+      setStatus(
+        shownCount < totalCount
+          ? `Showing ${shownCount} of ${totalCount.toLocaleString()} results`
+          : `${totalCount.toLocaleString()} result${totalCount !== 1 ? 's' : ''}`
+      );
+    }
+  }
+
+  function appendResults(books) {
+    const grid = results.querySelector('.book-grid');
+    if (!grid) return;
+    const frag = document.createDocumentFragment();
+    books.forEach(book => {
+      const div = document.createElement('div');
+      div.setAttribute('role', 'listitem');
+      div.innerHTML = renderBookCard(book);
+      frag.appendChild(div);
+    });
+    grid.appendChild(frag);
+  }
+
+  function renderLoadMore() {
+    const existing = results.querySelector('.search-load-more');
+    if (existing) existing.remove();
+    if (!nextPageUrl) return;
+    const btn = document.createElement('button');
+    btn.className = 'search-load-more';
+    btn.textContent = 'Load more';
+    btn.addEventListener('click', async () => {
+      btn.textContent = 'Loading…';
+      btn.disabled = true;
+      try {
+        const res = await fetch(nextPageUrl);
+        if (!res.ok) throw new Error();
+        const data = await res.json();
+        nextPageUrl = data.next || null;
+        shownCount += data.results.length;
+        appendResults(data.results);
+        updateStatus();
+        renderLoadMore();
+      } catch {
+        btn.textContent = 'Load more';
+        btn.disabled = false;
+      }
+    });
+    results.appendChild(btn);
+  }
+
   const doSearch = debounce(async function (query, fetchParams = {}) {
     query = query.trim();
     const cacheKey = query + JSON.stringify(fetchParams);
     if (cacheKey === lastQuery) return;
     lastQuery = cacheKey;
+    nextPageUrl = null;
+    shownCount = 0;
+    totalCount = 0;
 
     if (!query && !fetchParams.sort && !fetchParams.topic) {
       setStatus('');
@@ -271,13 +328,12 @@ function initSearch(container, params) {
         return;
       }
 
-      const count = data.count;
-      setStatus(
-        count > data.results.length
-          ? `Showing ${data.results.length} of ${count.toLocaleString()} results`
-          : `${count.toLocaleString()} result${count !== 1 ? 's' : ''}`
-      );
+      nextPageUrl = data.next || null;
+      shownCount = data.results.length;
+      totalCount = data.count;
+      updateStatus();
       showResults(renderResults(data.results));
+      renderLoadMore();
     } catch (err) {
       showResults(renderError('Could not reach Gutendex. Check your connection and try again.'));
     }

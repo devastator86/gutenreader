@@ -395,6 +395,14 @@ body {
 
 /* ─── Library ────────────────────────────────────────────────────── */
 
+.library-view .book-grid {
+  width: 100%;
+}
+
+.library-view .book-card {
+  width: 100%;
+}
+
 .library-card {
   position: relative;
 }
@@ -745,6 +753,34 @@ body {
   font-size: 0.75rem;
   font-weight: 500;
   -webkit-line-clamp: 3;
+}
+
+/* ─── Load More ─────────────────────────────────────────────────── */
+
+.search-load-more {
+  display: block;
+  width: 100%;
+  margin-top: var(--space-lg);
+  padding: var(--space-md);
+  font-family: var(--font-ui);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  color: var(--color-text-muted);
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: color var(--transition-fast), border-color var(--transition-fast);
+}
+
+.search-load-more:hover:not(:disabled) {
+  color: var(--color-accent);
+  border-color: var(--color-accent);
+}
+
+.search-load-more:disabled {
+  opacity: 0.5;
+  cursor: default;
 }
 
 /* ─── Desktop ────────────────────────────────────────────────────── */
