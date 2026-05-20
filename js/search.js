@@ -1,13 +1,18 @@
 /* ─── Gutendex Search ───────────────────────────────────────────── */
 
+const SVG_BOOK = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg>`;
+const SVG_WARN = `<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`;
+
 const GUTENDEX_BASE = 'https://gutendex.com/books/';
 
 function debounce(fn, delay) {
   let timer;
-  return function (...args) {
+  function debounced(...args) {
     clearTimeout(timer);
     timer = setTimeout(() => fn.apply(this, args), delay);
-  };
+  }
+  debounced.cancel = () => clearTimeout(timer);
+  return debounced;
 }
 
 function getTextUrl(formats) {
@@ -54,7 +59,7 @@ function renderLoading() {
 function renderError(message) {
   return `
     <div class="state-block" role="alert">
-      <div class="state-block-icon" aria-hidden="true">&#x26A0;</div>
+      <div class="state-block-icon">${SVG_WARN}</div>
       <p class="state-block-title">Search failed</p>
       <p class="state-block-body">${message}</p>
     </div>
@@ -64,7 +69,7 @@ function renderError(message) {
 function renderEmpty(query) {
   return `
     <div class="state-block">
-      <div class="state-block-icon" aria-hidden="true">&#x1F4DA;</div>
+      <div class="state-block-icon">${SVG_BOOK}</div>
       <p class="state-block-title">No results for &#x201C;${escapeHtml(query)}&#x201D;</p>
       <p class="state-block-body">Try a different title, author, or keyword.</p>
     </div>
@@ -94,7 +99,7 @@ function renderBookCardCompact(book) {
 
   const coverHtml = cover
     ? `<img src="${escapeHtml(cover)}" alt="" loading="lazy">`
-    : `<div class="book-cover-placeholder" aria-hidden="true">&#x1F4D6;</div>`;
+    : `<div class="book-cover-placeholder" aria-hidden="true">${SVG_BOOK}</div>`;
 
   return `
     <button
@@ -134,7 +139,7 @@ function renderDiscovery() {
         </div>
         <div class="discovery-books-wrap">
           <div class="discovery-books" id="popular-books">
-            <div class="state-block" role="status">
+            <div class="state-block" role="status" aria-label="Loading popular books">
               <div class="spinner" aria-hidden="true"></div>
             </div>
           </div>
@@ -152,14 +157,6 @@ function renderDiscovery() {
   `;
 }
 
-function escapeHtml(str) {
-  return str
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}
-
 function renderBookCard(book) {
   const cover = getCoverUrl(book.formats);
   const author = getAuthorName(book.authors);
@@ -168,7 +165,7 @@ function renderBookCard(book) {
 
   const coverHtml = cover
     ? `<img src="${escapeHtml(cover)}" alt="" loading="lazy">`
-    : `<div class="book-cover-placeholder" aria-hidden="true">&#x1F4D6;</div>`;
+    : `<div class="book-cover-placeholder" aria-hidden="true">${SVG_BOOK}</div>`;
 
   return `
     <button
@@ -208,6 +205,7 @@ function initSearch(container, params) {
         <p class="search-hero-subtitle">Read 70,000+ free classic books from Project Gutenberg.</p>
       </div>
       <form class="search-form" role="search" aria-label="Search books">
+        <label for="search-input" class="visually-hidden">Search books</label>
         <input
           type="search"
           class="search-input"
@@ -217,7 +215,6 @@ function initSearch(container, params) {
           autocorrect="off"
           autocapitalize="off"
           spellcheck="false"
-          aria-label="Search books"
         >
         <button type="button" class="search-clear" aria-label="Clear search">&#x2715;</button>
       </form>
@@ -383,17 +380,25 @@ function initSearch(container, params) {
     results.querySelectorAll('.discovery-chip').forEach(chip => {
       chip.addEventListener('click', () => {
         if (chip.dataset.type === 'genre') {
+          doSearch.cancel();
           input.value = '';
           updateClearBtn();
           setStatus('');
-          lastQuery = '';
-          doSearch.cancel && doSearch.cancel();
-          lastQuery = 'genre:' + chip.dataset.topic;
+          nextPageUrl = null;
+          shownCount = 0;
+          totalCount = 0;
+          const genreKey = 'genre:' + chip.dataset.topic;
+          lastQuery = genreKey;
           showResults(renderLoading());
           fetchBooks('', { topic: chip.dataset.topic }).then(data => {
+            if (lastQuery !== genreKey) return;
             if (!data.results || !data.results.length) { showResults(renderEmpty(chip.textContent)); return; }
-            setStatus(`${data.count.toLocaleString()} results`);
+            nextPageUrl = data.next || null;
+            shownCount = data.results.length;
+            totalCount = data.count;
+            updateStatus();
             showResults(renderResults(data.results));
+            renderLoadMore();
           }).catch(() => showResults(renderError('Could not reach Gutendex.')));
         } else {
           input.value = chip.dataset.query;

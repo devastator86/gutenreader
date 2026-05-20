@@ -39,10 +39,6 @@ function upsertLibraryBook(book) {
   saveLibrary(library);
 }
 
-function escapeHtml(str) {
-  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-}
-
 /* ─── URL helpers ───────────────────────────────────────────────── */
 
 function toHttps(url) {
@@ -136,8 +132,6 @@ function calcProgressPercent() {
   return total > 0 ? Math.min(100, (window.scrollY / total) * 100) : 0;
 }
 
-/* ─── Toolbar removed — settings panel handles all reading prefs ─── */
-
 /* ─── Render shell ──────────────────────────────────────────────── */
 
 function renderShell(container, title, authorName, bodyHtml) {
@@ -156,7 +150,7 @@ function renderShell(container, title, authorName, bodyHtml) {
           <p class="reader-book-author">${escapeHtml(authorName)}</p>
         </div>
 
-        <article class="reader-article" id="reader-article" aria-label="${escapeHtml(title)}">
+        <article class="reader-article" id="reader-article">
           ${bodyHtml}
         </article>
       </div>
@@ -166,12 +160,12 @@ function renderShell(container, title, authorName, bodyHtml) {
 
 function createFixedElements(savedPos) {
   const percentComplete = Math.round((savedPos / 100000) * 1000) / 10;
-  const currentFont = document.documentElement.dataset.font || 'serif';
 
   const progressBar = document.createElement('div');
   progressBar.className = 'reader-progress-bar';
   progressBar.id = 'reader-progress-bar';
   progressBar.setAttribute('role', 'progressbar');
+  progressBar.setAttribute('aria-label', 'Reading progress');
   progressBar.setAttribute('aria-valuenow', String(percentComplete));
   progressBar.setAttribute('aria-valuemin', '0');
   progressBar.setAttribute('aria-valuemax', '100');
@@ -186,7 +180,6 @@ function createFixedElements(savedPos) {
     <line x1="2" y1="9" x2="12" y2="9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
     <line x1="2" y1="13" x2="14" y2="13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
   </svg>`;
-
 
   const jumpBtn = document.createElement('button');
   jumpBtn.className = 'reader-jump-btn hidden';
@@ -212,9 +205,24 @@ function createFixedElements(savedPos) {
   const timeLabel = document.createElement('div');
   timeLabel.className = 'reader-time-label';
   timeLabel.id = 'reader-time-label';
+  timeLabel.setAttribute('aria-hidden', 'true');
 
   document.body.append(progressBar, contentsBtn, chapterNav, chapterNavBackdrop, jumpBtn, timeLabel);
   return { progressBar, contentsBtn, chapterNav, chapterNavBackdrop, jumpBtn, timeLabel };
+}
+
+/* ─── Overlay stack tracker (shared with settings) ─────────────── */
+
+let _overlayCount = 0;
+
+function pushOverlay() {
+  _overlayCount++;
+  document.body.style.overflow = 'hidden';
+}
+
+function popOverlay() {
+  _overlayCount = Math.max(0, _overlayCount - 1);
+  if (_overlayCount === 0) document.body.style.overflow = '';
 }
 
 /* ─── Fetch & Render ────────────────────────────────────────────── */
@@ -240,9 +248,12 @@ async function fetchAndRenderBook(container, bookId) {
     container.innerHTML = `
       <div class="reader-view">
         <div class="state-block" role="alert">
-          <div class="state-block-icon">&#x26A0;</div>
+          <div class="state-block-icon" aria-hidden="true">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          </div>
           <p class="state-block-title">Could not load book</p>
           <p class="state-block-body">Check your connection and try again.</p>
+          <button class="btn-retry" onclick="fetchAndRenderBook(document.getElementById('main-content'), ${bookId})">Try again</button>
         </div>
       </div>
     `;
@@ -273,9 +284,12 @@ async function fetchAndRenderBook(container, bookId) {
     container.innerHTML = `
       <div class="reader-view">
         <div class="state-block" role="alert">
-          <div class="state-block-icon">&#x26A0;</div>
+          <div class="state-block-icon" aria-hidden="true">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          </div>
           <p class="state-block-title">Could not fetch book</p>
           <p class="state-block-body">Check your connection and try again.</p>
+          <button class="btn-retry" onclick="fetchAndRenderBook(document.getElementById('main-content'), ${bookId})">Try again</button>
         </div>
       </div>
     `;
@@ -345,8 +359,9 @@ async function fetchAndRenderBook(container, bookId) {
       firstChapterH2.scrollIntoView({ behavior: 'smooth', block: 'start' });
       jumpBtn.classList.add('hidden');
     });
+    // Hide once the heading has scrolled past the top of the viewport
     const hideJumpOnScroll = () => {
-      if (firstChapterH2.getBoundingClientRect().top < window.innerHeight) {
+      if (firstChapterH2.getBoundingClientRect().top < 0) {
         jumpBtn.classList.add('hidden');
         window.removeEventListener('scroll', hideJumpOnScroll);
       }
@@ -358,21 +373,40 @@ async function fetchAndRenderBook(container, bookId) {
     chapterNav.classList.add('open');
     chapterNavBackdrop.classList.add('visible');
     contentsBtn.setAttribute('aria-expanded', 'true');
-    document.body.style.overflow = 'hidden';
+    pushOverlay();
   }
 
   function closeNav() {
+    if (!chapterNav.classList.contains('open')) return;
     chapterNav.classList.remove('open');
     chapterNavBackdrop.classList.remove('visible');
     contentsBtn.setAttribute('aria-expanded', 'false');
-    document.body.style.overflow = '';
+    popOverlay();
   }
 
   contentsBtn.addEventListener('click', () => chapterNav.classList.contains('open') ? closeNav() : openNav());
   chapterNavClose.addEventListener('click', closeNav);
   chapterNavBackdrop.addEventListener('click', closeNav);
 
-  if (savedPos > 0) requestAnimationFrame(() => scrollToOffset(savedPos));
+  // Restore scroll position after images have loaded to get accurate page height
+  if (savedPos > 0) {
+    // First rough restore so the user isn't left at the top while images load
+    requestAnimationFrame(() => scrollToOffset(savedPos));
+    // Then do a precise restore once layout settles
+    const imgs = Array.from(article.querySelectorAll('img'));
+    if (imgs.length > 0) {
+      let loaded = 0;
+      const onLoad = () => {
+        loaded++;
+        if (loaded >= imgs.length) scrollToOffset(savedPos);
+      };
+      imgs.forEach(img => {
+        if (img.complete) { loaded++; }
+        else { img.addEventListener('load', onLoad); img.addEventListener('error', onLoad); }
+      });
+      if (loaded >= imgs.length) scrollToOffset(savedPos);
+    }
+  }
 
   const totalChars = article.textContent.length;
   const charsPerMin = 1500;
@@ -408,12 +442,20 @@ async function fetchAndRenderBook(container, bookId) {
 
   window.addEventListener('scroll', onScroll, { passive: true });
 
+  function cleanupReader() {
+    window.removeEventListener('scroll', onScroll);
+    clearTimeout(scrollTimer);
+    // Force close nav before removing — ensures overlay counter is balanced
+    closeNav();
+    [progressBar, contentsBtn, chapterNav, chapterNavBackdrop, jumpBtn, timeLabel].forEach(el => {
+      if (el.parentNode) el.remove();
+    });
+    if (typeof hideSettingsSaveButton === 'function') hideSettingsSaveButton();
+  }
+
   const observer = new MutationObserver(() => {
     if (!document.getElementById('reader-view')) {
-      window.removeEventListener('scroll', onScroll);
-      closeNav();
-      [progressBar, contentsBtn, chapterNav, chapterNavBackdrop, jumpBtn, timeLabel].forEach(el => el.remove());
-      if (typeof hideSettingsSaveButton === 'function') hideSettingsSaveButton();
+      cleanupReader();
       observer.disconnect();
     }
   });

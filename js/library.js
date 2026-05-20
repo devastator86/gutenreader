@@ -1,5 +1,7 @@
 /* ─── Library ───────────────────────────────────────────────────── */
 
+const SVG_BOOK_LIB = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg>`;
+
 function getLibrary() {
   try {
     const raw = localStorage.getItem('gutenreader_library');
@@ -20,21 +22,13 @@ function removeFromLibrary(bookId) {
   saveLibrary(library);
 }
 
-function escapeHtml(str) {
-  return String(str)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}
-
 /* ─── Render ────────────────────────────────────────────────────── */
 
 function renderLibraryCard(book) {
   const pct = Math.min(100, Math.max(0, book.percentComplete || 0));
   const coverHtml = book.coverUrl
     ? `<img src="${escapeHtml(book.coverUrl)}" alt="" loading="lazy">`
-    : `<div class="book-cover-placeholder" aria-hidden="true">&#x1F4D6;</div>`;
+    : `<div class="book-cover-placeholder" aria-hidden="true">${SVG_BOOK_LIB}</div>`;
 
   return `
     <div class="library-card" data-id="${book.id}">
@@ -43,24 +37,22 @@ function renderLibraryCard(book) {
         data-id="${book.id}"
         aria-label="Open ${escapeHtml(book.title)}"
       >
-        <div class="book-cover">
-          ${coverHtml}
-          <div class="library-progress-bar">
-            <div class="library-progress-fill" style="width:${pct}%"></div>
-          </div>
-        </div>
+        <div class="book-cover">${coverHtml}</div>
         <div class="book-meta">
           <span class="book-title">${escapeHtml(book.title)}</span>
           <span class="book-author">${escapeHtml(book.author || 'Unknown author')}</span>
           <span class="book-year library-progress-label">${pct > 0 ? `${pct.toFixed(0)}% read` : 'Not started'}</span>
         </div>
       </button>
+      <div class="library-progress-bar" aria-hidden="true">
+        <div class="library-progress-fill" style="width:${pct}%"></div>
+      </div>
       <button
         class="library-remove-btn"
         data-id="${book.id}"
         aria-label="Remove ${escapeHtml(book.title)} from library"
         title="Remove from library"
-      >&#x2715;</button>
+      ><svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M1 1l10 10M11 1L1 11"/></svg></button>
     </div>
   `;
 }
@@ -68,7 +60,7 @@ function renderLibraryCard(book) {
 function renderEmpty() {
   return `
     <div class="state-block">
-      <div class="state-block-icon" aria-hidden="true">&#x1F4DA;</div>
+      <div class="state-block-icon">${SVG_BOOK_LIB}</div>
       <p class="state-block-title">Your library is empty</p>
       <p class="state-block-body">Save books while reading and they'll appear here.</p>
     </div>
